@@ -8,6 +8,7 @@ from gymnasium_env.grid_world_render import GridWorldRenderEnv
 from gymnasium.wrappers import FlattenObservation
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_checker import check_env
+from stable_baselines3.common.logger import configure
 
 import sys
 train = True if sys.argv[1] == 'train' else False
@@ -22,6 +23,8 @@ if train:
     env = FlattenObservation(env)
     check_env(env)
     model = PPO("MlpPolicy", env, verbose=1)
+    new_logger = configure('log/ppo_custom_env', ["stdout", "csv", "tensorboard"])
+    model.set_logger(new_logger)
     model.learn(total_timesteps=50_000)
     model.save("data/ppo_custom_env")
     print('model trained')
