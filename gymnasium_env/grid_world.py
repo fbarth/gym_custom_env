@@ -43,7 +43,8 @@ class GridWorldEnv(gym.Env):
         return {
             "distance": np.linalg.norm(
                 self._agent_location - self._target_location, ord=1
-            )
+            ),
+            "size": self.size
         }
     
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):

@@ -2,5 +2,6 @@ gymnasium
 numpy
 typing
 stable-baselines3
+pygame
 
 

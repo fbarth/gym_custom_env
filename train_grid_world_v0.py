@@ -1,6 +1,8 @@
 import gymnasium as gym
 from gymnasium_env.grid_world import GridWorldEnv
 from gymnasium.wrappers import FlattenObservation
+from stable_baselines3 import PPO
+from stable_baselines3.common.env_checker import check_env
 
 gym.register(
     id="gymnasium_env/GridWorld-v0",
@@ -8,10 +10,7 @@ gym.register(
 )
 env = gym.make("gymnasium_env/GridWorld-v0", size=5)
 env = FlattenObservation(env)
-
-from stable_baselines3 import PPO
-from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.env_checker import check_env
+check_env(env)
 
 model = PPO("MlpPolicy", env, verbose=1)
 model.learn(total_timesteps=10_000)
