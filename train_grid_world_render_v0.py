@@ -25,7 +25,7 @@ if train:
     model = PPO("MlpPolicy", env, verbose=1)
     new_logger = configure('log/ppo_custom_env', ["stdout", "csv", "tensorboard"])
     model.set_logger(new_logger)
-    model.learn(total_timesteps=50_000)
+    model.learn(total_timesteps=100_000)
     model.save("data/ppo_custom_env")
     print('model trained')
 

@@ -42,10 +42,30 @@ Os arquivos que utilizam o ambiente `GridWorldEnv` com renderização são:
 
 Este último arquivo tem um código mais completo, pois o agente é treinado para atuar em um ambiente que tem uma representação visual, o modelo treinado é salvo e depois carregado para fazer uma execução do ambiente. Os dados sobre o treinamento do agente são salvos para depois serem utilizados pelo `tensorboard`.
 
-**Proposta**: altere a função de reward. A atual é definida como: 
+**Proposta**: 
 
-$$
-f(x) = y
-$$
+* Altere a função de reward. A atual é definida como: 
+
+```python
+reward = 1 if terminated else 0
+```
+
+altere para uma versão onde toda ação que o agente realizada tem reward igual a `-1`, exceto quando ele encontra o objetivo. Neste caso, o reward é igual a `10`.
+
+* Execute o comando:
+
+```bash
+python train_grid_world_render_v0.py train
+```
+
+* Visualize a curva de aprendizado usando o plugin do tensorboard com os dados armazenados na pasta `log`. 
+
+* Execute diversas vezes o comando: 
+
+```bash
+python train_grid_world_render_v0.py test
+```
+
+para visualizar se o agente aprendeu a melhor política. 
 
 
