@@ -24,4 +24,3 @@ while not done:
     action, _ = model.predict(obs, deterministic=True)
     obs, reward, done, _, _ = env.step(action.item())
     print(f"Action: {action}, Reward: {reward}, Next State: {obs}")
-    #env.render()
