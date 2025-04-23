@@ -15,7 +15,7 @@ source venv/bin/activate # para ativar o ambiente virtual
 pip install -r requirements.txt # para instalar as dependências
 ```
 
-## Primeiro exemplo
+## Primeiro exemplo: ambiente GridWorld sem renderização
 
 O primeiro exemplo é um ambiente simples de grid world. O agente pode se mover para cima, baixo, esquerda ou direita. O objetivo do agente é chegar ao objetivo (goal) o mais rápido possível. O ambiente é definido na classe `GridWorldEnv` que está no arquivo `grid_world.py` dentro da pasta `gymnasium_env`. 
 
@@ -30,7 +30,7 @@ Os arquivos listados abaixo utilizam o ambiente `GridWorldEnv`:
 
 * `train_grid_world_v0.py`: faz uso do algoritmo PPO da biblioteca Stable Baselines3 para treinar um agente para atuar no ambiente `GridWorldEnv`. 
 
-## Segundo exemplo
+## Segundo exemplo: ambiente GridWorld com renderização
 
 O segundo exemplo é o mesmo ambiente de grid world, mas agora a implementação do ambiente tem o método `render` que mostra visualmente o ambiente. A implementação deste ambiente está no arquivo `grid_world_render.py` dentro da pasta `gymnasium_env`.
 
@@ -68,4 +68,12 @@ python train_grid_world_render_v0.py test
 
 para visualizar se o agente aprendeu a melhor política. 
 
+
+## Ambiente GridWorld com renderização e obstáculos
+
+**Sugestão**: alterar o código disponível em [gymnasium_env/grid_world_render.py](./gymnasium_env/grid_world_render.py) para que a representação do estado também considere obstáculos. Claro que a alteração na forma como o estado é representado também tem impacto no comportamento das ações do agente. 
+
+## Uso do ambiente GridWorld para problemas de Coverage Path Planning
+
+**Sugestão**: considerando a última versão do ambiente GridWorld, com renderização e obstáculos, altere a função de *reward*. 
 
