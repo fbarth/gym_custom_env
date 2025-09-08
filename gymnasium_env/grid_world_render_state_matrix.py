@@ -11,7 +11,7 @@ import pygame
 # This environment implements a simple grid world without obstacles. 
 # The agent (blue circle) must reach the target (red square) in as few steps as possible.
 #
-# The state is represented as a dictionary with the agent's and target's coordinates.
+# The state is represented as a full matrix with the agent's and target's coordinates.
 # The action space is discrete with 4 actions: move right, up, left, down.
 # The agent receives a reward of 1 when it reaches the target, and 0 otherwise.
 # The episode ends when the agent reaches the target.
@@ -29,23 +29,25 @@ class GridWorldRenderEnv(gym.Env):
         self._agent_location = np.array([-1, -1], dtype=np.int32)
         self._target_location = np.array([-1, -1], dtype=np.int32)
 
-        # Observations are dictionaries with the agent's and the target's location.
-        # Each location is encoded as an element of {0, ..., `size`-1}^2
+        # The state is represented with the agent's and target's location and the grid matrix
         self.observation_space = gym.spaces.Dict(
             {
                 "agent": gym.spaces.Box(0, size - 1, shape=(2,), dtype=int),
                 "target": gym.spaces.Box(0, size - 1, shape=(2,), dtype=int),
+                "matrix": gym.spaces.Box(0, 2, shape=(size, size, 1), dtype=np.uint8)  # Changed to uint8
             }
         )
+
+        self._matrix = np.zeros((size, size), dtype=np.uint8)  # Also change matrix dtype    
 
         # We have 4 actions, corresponding to "right", "up", "left", "down"
         self.action_space = gym.spaces.Discrete(4)
         # Dictionary maps the abstract actions to the directions on the grid
         self._action_to_direction = {
             0: np.array([1, 0]),  # right
-            1: np.array([0, 1]),  # up
+            1: np.array([0, -1]),  # up
             2: np.array([-1, 0]),  # left
-            3: np.array([0, -1]),  # down
+            3: np.array([0, 1]),  # down
         }
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
@@ -62,8 +64,8 @@ class GridWorldRenderEnv(gym.Env):
         self.clock = None
 
     def _get_obs(self):
-        return {"agent": self._agent_location, "target": self._target_location}
-    
+        return {"agent": self._agent_location, "target": self._target_location, "matrix": np.expand_dims(self._matrix, axis=-1)}
+
     def _get_info(self):
         return {
             "distance": np.linalg.norm(
@@ -85,6 +87,9 @@ class GridWorldRenderEnv(gym.Env):
             self._target_location = self.np_random.integers(
                 0, self.size, size=2, dtype=int
             )
+        
+        self._matrix[self._agent_location[0], self._agent_location[1]] = 1
+        self._matrix[self._target_location[0], self._target_location[1]] = 2
 
         observation = self._get_obs()
         info = self._get_info()
@@ -94,18 +99,51 @@ class GridWorldRenderEnv(gym.Env):
 
         return observation, info
     
+    def distance(self, location, target):
+        x = (location[0] - target[0])*(location[0] - target[0])
+        y = (location[1] - target[1])*(location[1] - target[1])
+        return np.sqrt(x+y)
+
     def step(self, action):
+        truncated = False
+
         # Map the action (element of {0,1,2,3}) to the direction we walk in
         direction = self._action_to_direction[action]
+
+        # Store previous distance for reward calculation
+        prev_distance = self.distance(self._agent_location, self._target_location)
+        old_location = self._agent_location.copy()
+
+        # Update the agent's location to zero before moving
+        self._matrix[self._agent_location[0], self._agent_location[1]] = 0
+
         # We use `np.clip` to make sure we don't leave the grid bounds
         self._agent_location = np.clip(
             self._agent_location + direction, 0, self.size - 1
         )
+        self._matrix[self._agent_location[0], self._agent_location[1]] = 1
+
+        # Calculate current distance
+        current_distance = self.distance(self._agent_location, self._target_location)
 
         # An environment is completed if and only if the agent has reached the target
         terminated = np.array_equal(self._agent_location, self._target_location)
-        truncated = False
-        reward = 1 if terminated else 0  # the agent is only reached at the end of the episode
+
+        # Improved reward function
+        if terminated:
+            reward = 100.0  # Large positive reward for reaching target
+        else:
+            # Distance-based reward: positive if getting closer, negative if getting farther
+            distance_reward = (prev_distance - current_distance) * 10.0
+        
+            # Step penalty to encourage efficiency
+            step_penalty = -1.0
+        
+            # Optional: Add penalty for staying in same position (if agent hits wall)
+            same_position_penalty = -5.0 if np.array_equal(old_location,self._agent_location) else 0.0
+        
+            reward = distance_reward + step_penalty + same_position_penalty
+        
         observation = self._get_obs()
         info = self._get_info()
 

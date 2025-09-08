@@ -4,7 +4,7 @@
 #
 
 import gymnasium as gym
-from gymnasium_env.grid_world_render import GridWorldRenderEnv
+from gymnasium_env.grid_world_render_state_matrix import GridWorldRenderEnv
 from gymnasium.wrappers import FlattenObservation
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_checker import check_env
@@ -22,6 +22,7 @@ if train:
     env = gym.make("gymnasium_env/GridWorld-v0", size=10, render_mode="rgb_array")
     env = FlattenObservation(env)
     check_env(env)
+    
     model = PPO("MlpPolicy", env, verbose=1)
     new_logger = configure('log/ppo_custom_env', ["stdout", "csv", "tensorboard"])
     model.set_logger(new_logger)
@@ -35,8 +36,9 @@ env = gym.make("gymnasium_env/GridWorld-v0", size=10, render_mode="human")
 env = FlattenObservation(env)
 (obs, _) = env.reset()
 done = False
+truncated = False
 
-while not done:
+while not done and not truncated:
     action, _ = model.predict(obs, deterministic=True)
-    obs, reward, done, _, _ = env.step(action.item())
-    print(f"Action: {action}, Reward: {reward}, Next State: {obs}")
+    obs, reward, done, truncated, _ = env.step(action.item())
+    print(f"Action: {action}, Reward: {reward}, Next State: {obs}, Done: {done}, Truncated: {truncated}")
