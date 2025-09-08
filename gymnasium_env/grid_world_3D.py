@@ -14,6 +14,8 @@ class GridWorldEnv(gym.Env):
     def __init__(self, size: int = 5):
         # The size of the square grid
         self.size = size
+        self.count_steps = 0
+        self.max_steps = 100
 
         # Define the agent and target location; randomly chosen in `reset` and updated in `step`
         self._agent_location = np.array([-1, -1, -1], dtype=np.int32)
@@ -68,6 +70,8 @@ class GridWorldEnv(gym.Env):
         observation = self._get_obs()
         info = self._get_info()
 
+        self.count_steps = 0
+
         return observation, info
     
     def step(self, action):
@@ -78,10 +82,22 @@ class GridWorldEnv(gym.Env):
             self._agent_location + direction, 0, self.size - 1
         )
 
+        reward = 0
+
         # An environment is completed if and only if the agent has reached the target
         terminated = np.array_equal(self._agent_location, self._target_location)
-        truncated = False
-        reward = 1 if terminated else 0  # the agent is only reached at the end of the episode
+
+        if terminated:
+            reward = 1
+
+        if self.count_steps >= self.max_steps:
+            truncated = True
+        else:
+            truncated = False
+
+        if truncated:
+            reward = -1
+
         observation = self._get_obs()
         info = self._get_info()
 

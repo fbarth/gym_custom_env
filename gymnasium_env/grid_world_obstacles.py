@@ -20,10 +20,14 @@ class GridWorldRenderEnv(gym.Env):
 
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
-    def __init__(self, render_mode=None, size: int = 5):
+    def __init__(self, render_mode=None, size: int = 5, obs_quantity: int = 5):
         # The size of the square grid
         self.size = size
         self.window_size = 512
+        self.obs_quantity = obs_quantity
+        self.obstacles_locations = []
+        self._count_steps = 0
+        self._max_steps = 100
 
         # Define the agent and target location; randomly chosen in `reset` and updated in `step`
         self._agent_location = np.array([-1, -1], dtype=np.int32)
@@ -34,7 +38,7 @@ class GridWorldRenderEnv(gym.Env):
             {
                 "agent": gym.spaces.Box(0, size - 1, shape=(2,), dtype=int),
                 "target": gym.spaces.Box(0, size - 1, shape=(2,), dtype=int),
-                "matrix": gym.spaces.Box(0, 2, shape=(size, size, 1), dtype=np.uint8)  # Changed to uint8
+                #"matrix": gym.spaces.Box(0, 3, shape=(size, size, 1), dtype=int)
             }
         )
 
@@ -62,9 +66,26 @@ class GridWorldRenderEnv(gym.Env):
         """
         self.window = None
         self.clock = None
+    
+    def extract_3x3(self, matrix, center_row, center_col):
+        rows = len(matrix)
+        cols = len(matrix[0])
+        submatrix = []
+        for i in range(center_row - 1, center_row + 2):
+            row = []
+            for j in range(center_col - 1, center_col + 2):
+                if 0 <= i < rows and 0 <= j < cols:
+                    row.append(matrix[i][j])
+                else:
+                    row.append(3)  # Out of bounds
+            submatrix.append(row)
+        return submatrix
 
     def _get_obs(self):
-        return {"agent": self._agent_location, "target": self._target_location, "matrix": np.expand_dims(self._matrix, axis=-1)}
+        #submatrix = self.extract_3x3(self._matrix, self._agent_location[0], self._agent_location[1])
+        #return {"agent": self._agent_location, "target": self._target_location, "matrix": np.expand_dims(submatrix, axis=-1)}
+        #return {"agent": self._agent_location, "target": self._target_location, "matrix": np.expand_dims(self._matrix, axis=-1)}
+        return {"agent": self._agent_location, "target": self._target_location}
 
     def _get_info(self):
         return {
@@ -77,6 +98,7 @@ class GridWorldRenderEnv(gym.Env):
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         # We need the following line to seed self.np_random
         super().reset(seed=seed)
+        self._count_steps = 0
 
         # Choose the agent's location uniformly at random
         self._agent_location = self.np_random.integers(0, self.size, size=2, dtype=int)
@@ -90,6 +112,15 @@ class GridWorldRenderEnv(gym.Env):
         
         self._matrix[self._agent_location[0], self._agent_location[1]] = 1
         self._matrix[self._target_location[0], self._target_location[1]] = 2
+
+        for _ in range(self.obs_quantity):
+            obstacle_location = self._agent_location
+            while (np.array_equal(obstacle_location, self._agent_location) or 
+                   np.array_equal(obstacle_location, self._target_location) or
+                   any(np.array_equal(obstacle_location, loc) for loc in self.obstacles_locations)):
+                obstacle_location = self.np_random.integers(0, self.size, size=2, dtype=int)
+            self.obstacles_locations.append(obstacle_location)
+            self._matrix[obstacle_location[0], obstacle_location[1]] = 3
 
         observation = self._get_obs()
         info = self._get_info()
@@ -106,6 +137,10 @@ class GridWorldRenderEnv(gym.Env):
 
     def step(self, action):
         truncated = False
+        terminated = False
+        self._count_steps += 1
+        #if self._count_steps >= self._max_steps:
+        #    truncated = True
 
         # Map the action (element of {0,1,2,3}) to the direction we walk in
         direction = self._action_to_direction[action]
@@ -122,6 +157,12 @@ class GridWorldRenderEnv(gym.Env):
             self._agent_location + direction, 0, self.size - 1
         )
         self._matrix[self._agent_location[0], self._agent_location[1]] = 1
+
+        # If the agent hits an obstacle, it stays in the same position
+        if any(np.array_equal(self._agent_location, loc) for loc in self.obstacles_locations):
+            self._matrix[self._agent_location[0], self._agent_location[1]] = 3
+            self._agent_location = old_location
+            self._matrix[self._agent_location[0], self._agent_location[1]] = 1
 
         # Calculate current distance
         current_distance = self.distance(self._agent_location, self._target_location)
@@ -140,9 +181,14 @@ class GridWorldRenderEnv(gym.Env):
             step_penalty = -1.0
         
             # Optional: Add penalty for staying in same position (if agent hits wall)
-            same_position_penalty = -5.0 if np.array_equal(old_location,self._agent_location) else 0.0
+            same_position_penalty = -10.0 if np.array_equal(old_location,self._agent_location) else 0.0
         
             reward = distance_reward + step_penalty + same_position_penalty
+        
+        if self._count_steps >= self._max_steps:
+            reward = -10  # Large negative reward for exceeding max steps
+            terminated = True # for some reason, truncated = True is not working
+            self._count_steps = 0
         
         observation = self._get_obs()
         info = self._get_info()
@@ -189,6 +235,17 @@ class GridWorldRenderEnv(gym.Env):
             (self._agent_location + 0.5) * pix_square_size,
             pix_square_size / 3,
         )
+
+        # Draw the obstacles
+        for obs in self.obstacles_locations:
+            pygame.draw.rect(
+                canvas,
+                (0, 0, 0),
+                pygame.Rect(
+                    pix_square_size * obs,
+                    (pix_square_size, pix_square_size),
+                ),
+            )
 
         # Finally, add some gridlines
         for x in range(self.size + 1):

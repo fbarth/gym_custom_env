@@ -19,7 +19,7 @@ gym.register(
 )
 
 if train:
-    env = gym.make("gymnasium_env/GridWorld-v0", size=10, render_mode="rgb_array")
+    env = gym.make("gymnasium_env/GridWorld-v0", size=5, obs_quantity=4, render_mode="rgb_array")
     env = FlattenObservation(env)
     check_env(env)
     
@@ -32,7 +32,7 @@ if train:
 
 print('loading model')
 model = PPO.load("data/ppo_custom_env")
-env = gym.make("gymnasium_env/GridWorld-v0", size=10, render_mode="human")
+env = gym.make("gymnasium_env/GridWorld-v0", size=5, obs_quantity=4, render_mode="human")
 env = FlattenObservation(env)
 (obs, _) = env.reset()
 done = False
