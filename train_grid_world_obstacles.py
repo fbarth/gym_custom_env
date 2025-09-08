@@ -4,7 +4,7 @@
 #
 
 import gymnasium as gym
-from gymnasium_env.grid_world_render_state_matrix import GridWorldRenderEnv
+from gymnasium_env.grid_world_obstacles import GridWorldRenderEnv
 from gymnasium.wrappers import FlattenObservation
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_checker import check_env

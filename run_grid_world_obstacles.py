@@ -1,5 +1,5 @@
 import gymnasium as gym
-from gymnasium_env.grid_world_render_state_matrix import GridWorldRenderEnv
+from gymnasium_env.grid_world_obstacles import GridWorldRenderEnv
 
 def get_direction(action):
     return {
