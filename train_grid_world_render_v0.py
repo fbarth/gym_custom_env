@@ -22,7 +22,7 @@ if train:
     env = gym.make("gymnasium_env/GridWorld-v0", size=10, render_mode="rgb_array")
     env = FlattenObservation(env)
     check_env(env)
-    model = PPO("MlpPolicy", env, verbose=1)
+    model = PPO("MlpPolicy", env, verbose=1, device="cpu")
     new_logger = configure('log/ppo_custom_env', ["stdout", "csv", "tensorboard"])
     model.set_logger(new_logger)
     model.learn(total_timesteps=100_000)

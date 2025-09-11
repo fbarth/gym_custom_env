@@ -11,7 +11,7 @@ import pygame
 # This environment implements a simple grid world without obstacles. 
 # The agent (blue circle) must reach the target (red square) in as few steps as possible.
 #
-# The state is represented as a full matrix with the agent's and target's coordinates.
+# The state is represented as a full matrix with the agent's and target's coordinates. TODO
 # The action space is discrete with 4 actions: move right, up, left, down.
 # The agent receives a reward of 1 when it reaches the target, and 0 otherwise.
 # The episode ends when the agent reaches the target.
@@ -26,23 +26,24 @@ class GridWorldRenderEnv(gym.Env):
         self.window_size = 512
         self.obs_quantity = obs_quantity
         self.obstacles_locations = []
-        self._count_steps = 0
-        self._max_steps = 100
+        self.count_steps = 0
+        self.max_steps = 100
 
         # Define the agent and target location; randomly chosen in `reset` and updated in `step`
-        self._agent_location = np.array([-1, -1], dtype=np.int32)
-        self._target_location = np.array([-1, -1], dtype=np.int32)
+        self._agent_location = np.array([-1, -1], dtype=int)
+        self._target_location = np.array([-1, -1], dtype=int)
+        self._neighbors = np.array([0,0,0,0], dtype=int)  #up, down, left, right
 
-        # The state is represented with the agent's and target's location and the grid matrix
-        self.observation_space = gym.spaces.Dict(
-            {
-                "agent": gym.spaces.Box(0, size - 1, shape=(2,), dtype=int),
-                "target": gym.spaces.Box(0, size - 1, shape=(2,), dtype=int),
-                #"matrix": gym.spaces.Box(0, 3, shape=(size, size, 1), dtype=int)
-            }
-        )
+        # The state is represented with the agent's and target's location and the grid of neighbors
+        self.observation_space = gym.spaces.Box(0, size - 1, shape=(2 + 2 + 4,), dtype=int)
 
-        self._matrix = np.zeros((size, size), dtype=np.uint8)  # Also change matrix dtype    
+#        self.observation_space = gym.spaces.Dict(
+#            {
+#                "agent": gym.spaces.Box(0, size - 1, shape=(2,), dtype=int),
+#                "target": gym.spaces.Box(0, size - 1, shape=(2,), dtype=int),
+#                "neighbors": gym.spaces.Box(0, 1, shape=(4,), dtype=int)
+#            }
+#        )
 
         # We have 4 actions, corresponding to "right", "up", "left", "down"
         self.action_space = gym.spaces.Discrete(4)
@@ -66,27 +67,15 @@ class GridWorldRenderEnv(gym.Env):
         """
         self.window = None
         self.clock = None
-    
-    def extract_3x3(self, matrix, center_row, center_col):
-        rows = len(matrix)
-        cols = len(matrix[0])
-        submatrix = []
-        for i in range(center_row - 1, center_row + 2):
-            row = []
-            for j in range(center_col - 1, center_col + 2):
-                if 0 <= i < rows and 0 <= j < cols:
-                    row.append(matrix[i][j])
-                else:
-                    row.append(3)  # Out of bounds
-            submatrix.append(row)
-        return submatrix
 
     def _get_obs(self):
-        #submatrix = self.extract_3x3(self._matrix, self._agent_location[0], self._agent_location[1])
-        #return {"agent": self._agent_location, "target": self._target_location, "matrix": np.expand_dims(submatrix, axis=-1)}
-        #return {"agent": self._agent_location, "target": self._target_location, "matrix": np.expand_dims(self._matrix, axis=-1)}
-        return {"agent": self._agent_location, "target": self._target_location}
+        flattened = []
+        flattened.extend(self._agent_location)
+        flattened.extend(self._target_location)
+        flattened.extend(self._neighbors)
+        return np.array(flattened, dtype=int)
 
+    
     def _get_info(self):
         return {
             "distance": np.linalg.norm(
@@ -94,11 +83,22 @@ class GridWorldRenderEnv(gym.Env):
             ),
             "size": self.size
         }
-    
+
+    def set_neighbors(self, obstacles_locations):
+        # create a map of the neighbors
+        # 1 = free, 0 = obstacle or wall
+        directions = [np.array([1, 0]), np.array([0, -1]), np.array([-1, 0]), np.array([0, 1])]
+        for i, direction in enumerate(directions):
+            neighbor = self._agent_location + direction
+            if (0 <= neighbor[0] < self.size) and (0 <= neighbor[1] < self.size) and not any(np.array_equal(neighbor, loc) for loc in obstacles_locations):
+                self._neighbors[i] = 0
+            else:
+                self._neighbors[i] = 1
+
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         # We need the following line to seed self.np_random
         super().reset(seed=seed)
-        self._count_steps = 0
+        self.count_steps = 0
 
         # Choose the agent's location uniformly at random
         self._agent_location = self.np_random.integers(0, self.size, size=2, dtype=int)
@@ -108,10 +108,7 @@ class GridWorldRenderEnv(gym.Env):
         while np.array_equal(self._target_location, self._agent_location):
             self._target_location = self.np_random.integers(
                 0, self.size, size=2, dtype=int
-            )
-        
-        self._matrix[self._agent_location[0], self._agent_location[1]] = 1
-        self._matrix[self._target_location[0], self._target_location[1]] = 2
+            )        
 
         for _ in range(self.obs_quantity):
             obstacle_location = self._agent_location
@@ -120,7 +117,8 @@ class GridWorldRenderEnv(gym.Env):
                    any(np.array_equal(obstacle_location, loc) for loc in self.obstacles_locations)):
                 obstacle_location = self.np_random.integers(0, self.size, size=2, dtype=int)
             self.obstacles_locations.append(obstacle_location)
-            self._matrix[obstacle_location[0], obstacle_location[1]] = 3
+
+        self.set_neighbors(self.obstacles_locations)
 
         observation = self._get_obs()
         info = self._get_info()
@@ -136,11 +134,6 @@ class GridWorldRenderEnv(gym.Env):
         return np.sqrt(x+y)
 
     def step(self, action):
-        truncated = False
-        terminated = False
-        self._count_steps += 1
-        #if self._count_steps >= self._max_steps:
-        #    truncated = True
 
         # Map the action (element of {0,1,2,3}) to the direction we walk in
         direction = self._action_to_direction[action]
@@ -149,54 +142,48 @@ class GridWorldRenderEnv(gym.Env):
         prev_distance = self.distance(self._agent_location, self._target_location)
         old_location = self._agent_location.copy()
 
-        # Update the agent's location to zero before moving
-        self._matrix[self._agent_location[0], self._agent_location[1]] = 0
-
         # We use `np.clip` to make sure we don't leave the grid bounds
         self._agent_location = np.clip(
             self._agent_location + direction, 0, self.size - 1
         )
-        self._matrix[self._agent_location[0], self._agent_location[1]] = 1
 
         # If the agent hits an obstacle, it stays in the same position
         if any(np.array_equal(self._agent_location, loc) for loc in self.obstacles_locations):
-            self._matrix[self._agent_location[0], self._agent_location[1]] = 3
             self._agent_location = old_location
-            self._matrix[self._agent_location[0], self._agent_location[1]] = 1
+
+        self.set_neighbors(self.obstacles_locations)
 
         # Calculate current distance
         current_distance = self.distance(self._agent_location, self._target_location)
 
+        self.count_steps += 1
+        reward = 0
+
         # An environment is completed if and only if the agent has reached the target
         terminated = np.array_equal(self._agent_location, self._target_location)
 
-        # Improved reward function
         if terminated:
-            reward = 100.0  # Large positive reward for reaching target
+            reward = 1
+
+        if self.count_steps >= self.max_steps:
+            truncated = True
         else:
-            # Distance-based reward: positive if getting closer, negative if getting farther
-            distance_reward = (prev_distance - current_distance) * 10.0
-        
-            # Step penalty to encourage efficiency
-            step_penalty = -1.0
-        
-            # Optional: Add penalty for staying in same position (if agent hits wall)
-            same_position_penalty = -10.0 if np.array_equal(old_location,self._agent_location) else 0.0
-        
-            reward = distance_reward + step_penalty + same_position_penalty
-        
-        if self._count_steps >= self._max_steps:
-            reward = -10  # Large negative reward for exceeding max steps
-            terminated = True # for some reason, truncated = True is not working
-            self._count_steps = 0
-        
+            truncated = False
+
+        if truncated:
+            reward = -1
+
         observation = self._get_obs()
         info = self._get_info()
 
         if self.render_mode == "human":
             self._render_frame()
 
-        return observation, reward, terminated, truncated, info
+        #
+        # terminar via max_steps está zoando o treinamento!!!! TODO porque? 
+        #
+
+        return observation, reward, terminated, False, info
     
     
     def render(self):

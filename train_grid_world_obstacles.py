@@ -13,27 +13,36 @@ from stable_baselines3.common.logger import configure
 import sys
 train = True if sys.argv[1] == 'train' else False
 
-gym.register(
-    id="gymnasium_env/GridWorld-v0",
-    entry_point=GridWorldRenderEnv,
-)
+print(f"Train mode: {train}")
+
+try:
+    gym.register(
+        id="gymnasium_env/GridWorld-v1",
+        entry_point=GridWorldRenderEnv,
+    )
+except Exception as e:
+    print(f"Environment registration failed: {e}")
 
 if train:
-    env = gym.make("gymnasium_env/GridWorld-v0", size=5, obs_quantity=4, render_mode="rgb_array")
-    env = FlattenObservation(env)
-    check_env(env)
-    
-    model = PPO("MlpPolicy", env, verbose=1)
-    new_logger = configure('log/ppo_custom_env', ["stdout", "csv", "tensorboard"])
+    print("Starting training...") 
+    env = gym.make("gymnasium_env/GridWorld-v1", size=5, obs_quantity=4, render_mode="rgb_array")
+    #env = FlattenObservation(env)
+    print(f"Environment created. Observation space: {env.observation_space}")
+    #check_env(env)
+    #model = PPO("MultiInputPolicy", env, verbose=1)
+    model = PPO("MlpPolicy", env, verbose=1, device="cpu")
+    print("Model created, starting training...")
+    new_logger = configure('log/ppo_obstacles', ["stdout", "csv", "tensorboard"])
     model.set_logger(new_logger)
+    print("Logger configured, learning...")
     model.learn(total_timesteps=100_000)
-    model.save("data/ppo_custom_env")
+    model.save("data/ppo_obstacles")
     print('model trained')
 
 print('loading model')
-model = PPO.load("data/ppo_custom_env")
-env = gym.make("gymnasium_env/GridWorld-v0", size=5, obs_quantity=4, render_mode="human")
-env = FlattenObservation(env)
+model = PPO.load("data/ppo_obstacles")
+env = gym.make("gymnasium_env/GridWorld-v1", size=5, obs_quantity=4, render_mode="human")
+#env = FlattenObservation(env)
 (obs, _) = env.reset()
 done = False
 truncated = False

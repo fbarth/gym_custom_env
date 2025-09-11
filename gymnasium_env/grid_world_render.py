@@ -26,8 +26,8 @@ class GridWorldRenderEnv(gym.Env):
         self.window_size = 512
 
         # Define the agent and target location; randomly chosen in `reset` and updated in `step`
-        self._agent_location = np.array([-1, -1], dtype=np.int32)
-        self._target_location = np.array([-1, -1], dtype=np.int32)
+        self._agent_location = np.array([-1, -1], dtype=int)
+        self._target_location = np.array([-1, -1], dtype=int)
 
         # Observations are dictionaries with the agent's and the target's location.
         # Each location is encoded as an element of {0, ..., `size`-1}^2
