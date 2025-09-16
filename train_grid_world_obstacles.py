@@ -25,24 +25,20 @@ except Exception as e:
 
 if train:
     print("Starting training...") 
-    env = gym.make("gymnasium_env/GridWorld-v1", size=5, obs_quantity=4, render_mode="rgb_array")
-    #env = FlattenObservation(env)
+    env = gym.make("gymnasium_env/GridWorld-v1", size=10, obs_quantity=20, render_mode="rgb_array")
     print(f"Environment created. Observation space: {env.observation_space}")
-    #check_env(env)
-    #model = PPO("MultiInputPolicy", env, verbose=1)
     model = PPO("MlpPolicy", env, verbose=1, device="cpu")
     print("Model created, starting training...")
     new_logger = configure('log/ppo_obstacles', ["stdout", "csv", "tensorboard"])
     model.set_logger(new_logger)
     print("Logger configured, learning...")
-    model.learn(total_timesteps=100_000)
+    model.learn(total_timesteps=500_000)
     model.save("data/ppo_obstacles")
     print('model trained')
 
 print('loading model')
 model = PPO.load("data/ppo_obstacles")
-env = gym.make("gymnasium_env/GridWorld-v1", size=5, obs_quantity=4, render_mode="human")
-#env = FlattenObservation(env)
+env = gym.make("gymnasium_env/GridWorld-v1", size=10, obs_quantity=20, render_mode="human")
 (obs, _) = env.reset()
 done = False
 truncated = False

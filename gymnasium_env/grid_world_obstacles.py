@@ -11,10 +11,18 @@ import pygame
 # This environment implements a simple grid world without obstacles. 
 # The agent (blue circle) must reach the target (red square) in as few steps as possible.
 #
-# The state is represented as a full matrix with the agent's and target's coordinates. TODO
+# The state is represented as a flattened array containing:
+# - the agent's (x, y) location
+# - the target's (x, y) location
+# - the state of the 4 neighboring cells (up, down, left, right),
+#   where 0 indicates a free cell and 1 indicates an obstacle or wall.
+#
 # The action space is discrete with 4 actions: move right, up, left, down.
-# The agent receives a reward of 1 when it reaches the target, and 0 otherwise.
-# The episode ends when the agent reaches the target.
+#
+# The agent receives a reward of +10 for reaching the target, a small negative reward (-0.1) for each step taken,
+# and a negative reward (-10) if it exceeds the maximum number of steps without reaching the target.
+#
+# The episode ends when the agent reaches the target or after a maximum number of steps.
 
 class GridWorldRenderEnv(gym.Env):
 
@@ -36,14 +44,6 @@ class GridWorldRenderEnv(gym.Env):
 
         # The state is represented with the agent's and target's location and the grid of neighbors
         self.observation_space = gym.spaces.Box(0, size - 1, shape=(2 + 2 + 4,), dtype=int)
-
-#        self.observation_space = gym.spaces.Dict(
-#            {
-#                "agent": gym.spaces.Box(0, size - 1, shape=(2,), dtype=int),
-#                "target": gym.spaces.Box(0, size - 1, shape=(2,), dtype=int),
-#                "neighbors": gym.spaces.Box(0, 1, shape=(4,), dtype=int)
-#            }
-#        )
 
         # We have 4 actions, corresponding to "right", "up", "left", "down"
         self.action_space = gym.spaces.Discrete(4)
@@ -75,7 +75,6 @@ class GridWorldRenderEnv(gym.Env):
         flattened.extend(self._neighbors)
         return np.array(flattened, dtype=int)
 
-    
     def _get_info(self):
         return {
             "distance": np.linalg.norm(
@@ -99,6 +98,8 @@ class GridWorldRenderEnv(gym.Env):
         # We need the following line to seed self.np_random
         super().reset(seed=seed)
         self.count_steps = 0
+        self.reward = 0
+        self.obstacles_locations = []
 
         # Choose the agent's location uniformly at random
         self._agent_location = self.np_random.integers(0, self.size, size=2, dtype=int)
@@ -157,21 +158,21 @@ class GridWorldRenderEnv(gym.Env):
         current_distance = self.distance(self._agent_location, self._target_location)
 
         self.count_steps += 1
-        reward = 0
-
+        
         # An environment is completed if and only if the agent has reached the target
         terminated = np.array_equal(self._agent_location, self._target_location)
 
+        # Calculate reward based on distance
         if terminated:
-            reward = 1
+            reward = 10.0
+        else:
+            reward = prev_distance - current_distance - 0.1
 
-        if self.count_steps >= self.max_steps:
+        if self.count_steps >= self.max_steps and not terminated:
             truncated = True
+            reward = -10.0
         else:
             truncated = False
-
-        if truncated:
-            reward = -1
 
         observation = self._get_obs()
         info = self._get_info()
@@ -179,11 +180,7 @@ class GridWorldRenderEnv(gym.Env):
         if self.render_mode == "human":
             self._render_frame()
 
-        #
-        # terminar via max_steps está zoando o treinamento!!!! TODO porque? 
-        #
-
-        return observation, reward, terminated, False, info
+        return observation, reward, terminated, truncated, info
     
     
     def render(self):

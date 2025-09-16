@@ -72,14 +72,18 @@ O arquivo que utiliza o ambiente `GridWorldEnv` em 3D é:
 
 O quarto exemplo é uma extensão do ambiente de grid world para incluir obstáculos. O agente deve navegar pelo ambiente evitando os obstáculos para alcançar o objetivo. O ambiente é definido na classe `GridWorldEnv` que está no arquivo `grid_world_obstacles.py` dentro da pasta `gymnasium_env`.
 
+Para executar o treinamento do agente no ambiente com obstáculos, execute o comando:
 
+```bash
+python train_grid_world_obstacles.py train
+```
 
-<!--
-## Ambiente GridWorld com renderização e obstáculos
+Para testar o agente treinado no ambiente com obstáculos, execute o comando:
 
-**Sugestão**: alterar o código disponível em [gymnasium_env/grid_world_render.py](./gymnasium_env/grid_world_render.py) para que a representação do estado também considere obstáculos. Claro que a alteração na forma como o estado é representado também tem impacto no comportamento das ações do agente. 
+```bash
+python train_grid_world_obstacles.py test
+```
 
 ## Uso do ambiente GridWorld para problemas de Coverage Path Planning
 
-**Sugestão**: considerando a última versão do ambiente GridWorld, com renderização e obstáculos, altere a função de *reward*. 
--->
+**Sugestão**: considerando a última versão do ambiente GridWorld, com renderização e obstáculos, altere a função de *reward* e o que mais for necessário para que o agente aprenda a fazer *Coverage Path Planning* (CPP) em um ambiente 2D com obstáculos.
