@@ -98,7 +98,6 @@ class GridWorldRenderEnv(gym.Env):
         # We need the following line to seed self.np_random
         super().reset(seed=seed)
         self.count_steps = 0
-        self.reward = 0
         self.obstacles_locations = []
 
         # Choose the agent's location uniformly at random

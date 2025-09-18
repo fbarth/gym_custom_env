@@ -28,20 +28,26 @@ gym.register(
     entry_point=GridWorldEnv,
 )
 
+DIM=10
+MAX_STEPS=1000
+
 if train:
-    env = gym.make("gymnasium_env/GridWorld-v0", size=5)
+    env = gym.make("gymnasium_env/GridWorld-v0", size=DIM, max_steps=MAX_STEPS)
     env = FlattenObservation(env)
     check_env(env)
     model = PPO("MlpPolicy", env, verbose=1)
-    new_logger = configure('log/ppo_custom_env', ["stdout", "csv", "tensorboard"])
+    new_logger = configure(
+        f'log/ppo_grid_3d_{DIM}',
+        ["stdout", "csv", "tensorboard"]
+    )
     model.set_logger(new_logger)
-    model.learn(total_timesteps=100_000)
-    model.save("data/ppo_custom_env")
+    model.learn(total_timesteps=500_000)
+    model.save(f'data/ppo_grid_3d_{DIM}')
     print('model trained')
 
 print('loading model')
-model = PPO.load("data/ppo_custom_env")
-env = gym.make("gymnasium_env/GridWorld-v0", size=5)
+model = PPO.load(f'data/ppo_grid_3d_{DIM}')
+env = gym.make("gymnasium_env/GridWorld-v0", size=DIM, max_steps=MAX_STEPS)
 env = FlattenObservation(env)
 (obs, _) = env.reset()
 done = False

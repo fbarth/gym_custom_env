@@ -11,11 +11,11 @@ import gymnasium as gym
 
 class GridWorldEnv(gym.Env):
 
-    def __init__(self, size: int = 5):
+    def __init__(self, size: int = 5, max_steps: int = 100):
         # The size of the square grid
         self.size = size
         self.count_steps = 0
-        self.max_steps = 100
+        self.max_steps = max_steps
 
         # Define the agent and target location; randomly chosen in `reset` and updated in `step`
         self._agent_location = np.array([-1, -1, -1], dtype=np.int32)
@@ -56,6 +56,7 @@ class GridWorldEnv(gym.Env):
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         # We need the following line to seed self.np_random
         super().reset(seed=seed)
+        self.count_steps = 0
 
         # Choose the agent's location uniformly at random
         self._agent_location = self.np_random.integers(0, self.size, size=3, dtype=int)
@@ -70,8 +71,6 @@ class GridWorldEnv(gym.Env):
         observation = self._get_obs()
         info = self._get_info()
 
-        self.count_steps = 0
-
         return observation, info
     
     def step(self, action):
@@ -83,20 +82,30 @@ class GridWorldEnv(gym.Env):
         )
 
         reward = 0
+        self.count_steps += 1
 
         # An environment is completed if and only if the agent has reached the target
         terminated = np.array_equal(self._agent_location, self._target_location)
 
-        if terminated:
-            reward = 1
+        # if terminated:
+        #     reward = 1
 
-        if self.count_steps >= self.max_steps:
+        # if self.count_steps >= self.max_steps:
+        #     truncated = True
+        # else:
+        #     truncated = False
+
+        # if truncated:
+        #     reward = -1
+
+        if terminated:
+            reward = 1.0
+
+        if self.count_steps >= self.max_steps and not terminated:
             truncated = True
+            reward = -1.0
         else:
             truncated = False
-
-        if truncated:
-            reward = -1
 
         observation = self._get_obs()
         info = self._get_info()
