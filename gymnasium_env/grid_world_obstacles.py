@@ -28,14 +28,14 @@ class GridWorldRenderEnv(gym.Env):
 
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
-    def __init__(self, render_mode=None, size: int = 5, obs_quantity: int = 5):
+    def __init__(self, render_mode=None, size: int = 5, obs_quantity: int = 5, max_steps: int = 100):
         # The size of the square grid
         self.size = size
         self.window_size = 512
         self.obs_quantity = obs_quantity
         self.obstacles_locations = []
         self.count_steps = 0
-        self.max_steps = 100
+        self.max_steps = max_steps
 
         # Define the agent and target location; randomly chosen in `reset` and updated in `step`
         self._agent_location = np.array([-1, -1], dtype=int)

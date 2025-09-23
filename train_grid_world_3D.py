@@ -29,19 +29,20 @@ gym.register(
 )
 
 DIM=10
-MAX_STEPS=1000
+MAX_STEPS=500
+TOTAL_TIMESTEPS=500_000
 
 if train:
     env = gym.make("gymnasium_env/GridWorld-v0", size=DIM, max_steps=MAX_STEPS)
     env = FlattenObservation(env)
     check_env(env)
-    model = PPO("MlpPolicy", env, verbose=1)
+    model = PPO("MlpPolicy", env, verbose=1, ent_coef=0.02)
     new_logger = configure(
         f'log/ppo_grid_3d_{DIM}',
         ["stdout", "csv", "tensorboard"]
     )
     model.set_logger(new_logger)
-    model.learn(total_timesteps=500_000)
+    model.learn(total_timesteps=TOTAL_TIMESTEPS)
     model.save(f'data/ppo_grid_3d_{DIM}')
     print('model trained')
 
@@ -53,7 +54,7 @@ env = FlattenObservation(env)
 done = False
 
 steps = 0
-while not done and steps < 500:
+while not done and steps < MAX_STEPS:
     action, _ = model.predict(obs, deterministic=True)
     obs, reward, done, _, _ = env.step(action.item())
     print(f"Action: {print_action(action.item())}, Reward: {reward}, Next State: {obs}")
