@@ -9,6 +9,7 @@ from gymnasium.wrappers import FlattenObservation
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.logger import configure
+from datetime import datetime
 
 def print_action(action: int) -> str:
     return {
@@ -31,14 +32,16 @@ gym.register(
 DIM=10
 MAX_STEPS=500
 TOTAL_TIMESTEPS=500_000
+ENTROPY_COEF=0.02
 
 if train:
     env = gym.make("gymnasium_env/GridWorld-v0", size=DIM, max_steps=MAX_STEPS)
     env = FlattenObservation(env)
     check_env(env)
-    model = PPO("MlpPolicy", env, verbose=1, ent_coef=0.02)
+    model = PPO("MlpPolicy", env, verbose=1, ent_coef=ENTROPY_COEF)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     new_logger = configure(
-        f'log/ppo_grid_3d_{DIM}',
+        f'log/ppo_grid_3d_{DIM}_{MAX_STEPS}_{ENTROPY_COEF}_{timestamp}',
         ["stdout", "csv", "tensorboard"]
     )
     model.set_logger(new_logger)
