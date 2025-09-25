@@ -37,7 +37,12 @@ TOTAL_TIMESTEPS=500_000
 ENTROPY_COEF=0.02
 
 if sys.argv[1] == 'train':
-    env = gym.make("gymnasium_env/GridWorld-v0", size=DIM, max_steps=MAX_STEPS)
+    env = gym.make(
+        "gymnasium_env/GridWorld-v0", 
+        size=DIM, 
+        max_steps=MAX_STEPS,
+        render_mode="rgb_array"
+    )
     env = FlattenObservation(env)
     check_env(env)
     model = PPO("MlpPolicy", env, verbose=1, ent_coef=ENTROPY_COEF)
@@ -55,7 +60,12 @@ elif sys.argv[1] == 'run':
     model_name = input("Enter model filename (without path and extension): ")
     print('loading model')
     model = PPO.load(f'data/{model_name}.zip')
-    env = gym.make("gymnasium_env/GridWorld-v0", size=DIM, max_steps=MAX_STEPS)
+    env = gym.make(
+        "gymnasium_env/GridWorld-v0", 
+        size=DIM, 
+        max_steps=MAX_STEPS, 
+        render_mode="human"
+    )
     env = FlattenObservation(env)
     (obs, _) = env.reset()
     done = False
@@ -73,7 +83,12 @@ else:
     success = 0
     model = PPO.load(f'data/{model_name}.zip')
     for i in range(100):    
-        env = gym.make("gymnasium_env/GridWorld-v0", size=DIM, max_steps=MAX_STEPS)
+        env = gym.make(
+            "gymnasium_env/GridWorld-v0", 
+            size=DIM, 
+            max_steps=MAX_STEPS,
+            render_mode="rgb_array"
+        )
         env = FlattenObservation(env)
         (obs, _) = env.reset()
         done = False

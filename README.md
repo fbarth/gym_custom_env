@@ -66,7 +66,21 @@ Este último arquivo tem um código mais completo, pois o agente é treinado par
 O terceiro exemplo é uma extensão do ambiente de grid world para um ambiente 3D. O agente pode se mover para cima, baixo, esquerda, direita, frente e trás. O objetivo do agente é chegar ao objetivo (goal) o mais rápido possível. O ambiente é definido na classe `GridWorldEnv` que está no arquivo `grid_world_3D.py` dentro da pasta `gymnasium_env`.
 
 O arquivo que utiliza o ambiente `GridWorldEnv` em 3D é:
-* `train_grid_world_3D.py`: faz uso do algoritmo PPO da biblioteca Stable Baselines3 para treinar um agente para atuar no ambiente `GridWorldEnv` em 3D sem renderização.
+* `train_grid_world_3D.py`: faz uso do algoritmo PPO da biblioteca Stable Baselines3 para treinar um agente para atuar no ambiente `GridWorldEnv` em 3D.
+
+Existem 3 (três) formas de uso do script `train_grid_world_3D.py`:
+* `python train_grid_world_3D.py train`: treina o agente e salva o modelo treinado na pasta `data` e os logs na pasta `log`.    
+* `python train_grid_world_3D.py test`: carrega o modelo treinado e executa 100 episódios, calculando o percentual de sucesso do agente, entre outras métricas.
+* `python train_grid_world_3D.py run`: carrega o modelo treinado e executa um único episódio, mostrando a renderização do ambiente 3D.
+
+Para que a renderização deste ambiente aconteça, é necessário ter a biblioteca `tkinter` instalada. No Ubuntu, você pode instalar esta biblioteca com o comando:
+
+```bash
+sudo apt-get install python3-tk
+```
+
+**Importante**: esta renderização 3D foi testada apenas no sistema operacional Ubuntu.
+
 
 ## Quarto exemplo: ambiente GridWorld com obstáculos
 
