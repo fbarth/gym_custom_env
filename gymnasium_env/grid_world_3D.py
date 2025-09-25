@@ -1,6 +1,11 @@
 from typing import Optional
 import numpy as np
 import gymnasium as gym
+import matplotlib
+matplotlib.use('TkAgg')  # Set the backend before importing pyplot
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 #
 # This code is based on the example available at:
@@ -10,12 +15,18 @@ import gymnasium as gym
 #
 
 class GridWorldEnv(gym.Env):
+    metadata = {"render_modes": ["human"], "render_fps": 4}
 
-    def __init__(self, size: int = 5, max_steps: int = 100):
+    def __init__(self, render_mode: Optional[str] = None, size: int = 5, max_steps: int = 100):
         # The size of the square grid
         self.size = size
         self.count_steps = 0
         self.max_steps = max_steps
+        
+        # Rendering setup
+        self.render_mode = render_mode
+        self.fig = None
+        self.ax = None
 
         # Define the agent and target location; randomly chosen in `reset` and updated in `step`
         self._agent_location = np.array([-1, -1, -1], dtype=np.int32)
@@ -71,6 +82,9 @@ class GridWorldEnv(gym.Env):
         observation = self._get_obs()
         info = self._get_info()
 
+        if self.render_mode == "human":
+            self._render_frame()
+
         return observation, info
     
     def step(self, action):
@@ -110,4 +124,93 @@ class GridWorldEnv(gym.Env):
         observation = self._get_obs()
         info = self._get_info()
 
+        if self.render_mode == "human":
+            self._render_frame()
+
         return observation, reward, terminated, truncated, info
+
+    def render(self):
+        if self.render_mode == "human":
+            print("Rendering frame...")  # Debug print
+            self._render_frame()
+
+    def _render_frame(self):
+        if self.fig is None:
+            plt.ion()  # Turn on interactive mode
+            self.fig = plt.figure(figsize=(10, 10))
+            self.ax = self.fig.add_subplot(111, projection='3d')
+            plt.show(block=False)  # Show the window without blocking
+            
+            # Try to bring window to front if possible
+            try:
+                # For Tk backend
+                self.fig.canvas.manager.window.lift()
+            except:
+                try:
+                    # For Qt backend
+                    self.fig.canvas.manager.window.raise_()
+                except:
+                    pass  # If neither method works, continue without raising window
+
+        self.ax.clear()
+        
+        # Set axis labels and limits
+        self.ax.set_xlabel('X')
+        self.ax.set_ylabel('Y')
+        self.ax.set_zlabel('Z')
+        self.ax.set_xlim([-0.5, self.size - 0.5])
+        self.ax.set_ylim([-0.5, self.size - 0.5])
+        self.ax.set_zlim([-0.5, self.size - 0.5])
+
+        # Draw grid lines
+        for i in range(self.size):
+            for j in range(self.size):
+                # Draw vertical lines
+                self.ax.plot([i, i], [j, j], [0, self.size-1], 'gray', alpha=0.2)
+                # Draw horizontal lines on each level
+                self.ax.plot([i, i], [0, self.size-1], [j, j], 'gray', alpha=0.2)
+                self.ax.plot([0, self.size-1], [i, i], [j, j], 'gray', alpha=0.2)
+
+        # Draw grid boundaries
+        vertices = np.array([
+            [0, 0, 0], [self.size-1, 0, 0], [self.size-1, self.size-1, 0], [0, self.size-1, 0],
+            [0, 0, self.size-1], [self.size-1, 0, self.size-1], 
+            [self.size-1, self.size-1, self.size-1], [0, self.size-1, self.size-1]
+        ])
+        edges = [
+            [vertices[0], vertices[1]], [vertices[1], vertices[2]], 
+            [vertices[2], vertices[3]], [vertices[3], vertices[0]],
+            [vertices[4], vertices[5]], [vertices[5], vertices[6]], 
+            [vertices[6], vertices[7]], [vertices[7], vertices[4]],
+            [vertices[0], vertices[4]], [vertices[1], vertices[5]], 
+            [vertices[2], vertices[6]], [vertices[3], vertices[7]]
+        ]
+        for edge in edges:
+            self.ax.plot3D(*zip(*edge), color='black', linewidth=2)
+
+        # Draw agent (blue sphere)
+        self.ax.scatter(self._agent_location[0], self._agent_location[1], 
+                       self._agent_location[2], color='blue', s=200, label='Agent')
+        
+        # Draw target (red star)
+        self.ax.scatter(self._target_location[0], self._target_location[1], 
+                       self._target_location[2], color='red', marker='*', s=200, label='Target')
+
+        # Add legend
+        self.ax.legend()
+
+        # Set title with current positions
+        self.ax.set_title(f'Agent: {tuple(self._agent_location)}, Target: {tuple(self._target_location)}')
+
+        # Adjust the view angle for better visibility
+        self.ax.view_init(elev=30, azim=45)
+
+        self.fig.canvas.draw()
+        self.fig.canvas.flush_events()
+        plt.pause(1)  # Smaller pause for smoother animation
+
+    def close(self):
+        if self.fig is not None:
+            plt.close(self.fig)
+            self.fig = None
+            self.ax = None
