@@ -40,10 +40,10 @@ class GridWorldRenderEnv(gym.Env):
         # Define the agent and target location; randomly chosen in `reset` and updated in `step`
         self._agent_location = np.array([-1, -1], dtype=int)
         self._target_location = np.array([-1, -1], dtype=int)
-        self._neighbors = np.array([0,0,0,0], dtype=int)  #up, down, left, right
+        self._neighbors = np.array([0,0,0,0,0,0,0,0], dtype=int)  #up, down, left, right, up-left, up-right, down-left, down-right
 
         # The state is represented with the agent's and target's location and the grid of neighbors
-        self.observation_space = gym.spaces.Box(0, size - 1, shape=(2 + 2 + 4,), dtype=int)
+        self.observation_space = gym.spaces.Box(0, size - 1, shape=(2 + 2 + 8,), dtype=int)
 
         # We have 4 actions, corresponding to "right", "up", "left", "down"
         self.action_space = gym.spaces.Discrete(4)
@@ -86,7 +86,8 @@ class GridWorldRenderEnv(gym.Env):
     def set_neighbors(self, obstacles_locations):
         # create a map of the neighbors
         # 1 = free, 0 = obstacle or wall
-        directions = [np.array([1, 0]), np.array([0, -1]), np.array([-1, 0]), np.array([0, 1])]
+        #directions = [np.array([1, 0]), np.array([0, -1]), np.array([-1, 0]), np.array([0, 1])]
+        directions = [np.array([1, 0]), np.array([0, -1]), np.array([-1, 0]), np.array([0, 1]), np.array([-1, -1]), np.array([1, -1]), np.array([-1, 1]), np.array([1, 1])]
         for i, direction in enumerate(directions):
             neighbor = self._agent_location + direction
             if (0 <= neighbor[0] < self.size) and (0 <= neighbor[1] < self.size) and not any(np.array_equal(neighbor, loc) for loc in obstacles_locations):
@@ -164,8 +165,12 @@ class GridWorldRenderEnv(gym.Env):
         # Calculate reward based on distance
         if terminated:
             reward = 10.0
+        elif np.array_equal(self._agent_location, old_location):
+            reward = -2.0  # Penalty for hitting an obstacle
+        #else:
+        #    reward = prev_distance - current_distance - 0.1
         else:
-            reward = prev_distance - current_distance - 0.1
+            reward = -0.1  # Small step penalty to encourage shorter paths
 
         if self.count_steps >= self.max_steps and not terminated:
             truncated = True

@@ -38,6 +38,12 @@ OBSTACLES = 40
 MAX_STEPS = 500
 TOTAL_TIMESTEPS = 500_000
 ENTROPY_COEF = 0.02
+
+# v1 or 
+# v2 (with penalty for hitting obstacles) or 
+# v3 (with diagonal representation of obstacles and penalty for hitting obstacles) or
+# v4 (with diagonal representation of obstacles and penalty for hitting obstacles, and larger penalty for hitting multiple obstacles and without small step penalty)
+REWARD_VERSION = 'v4'  
 # -----------------------
 
 if mode == 'train':
@@ -54,8 +60,8 @@ if mode == 'train':
     model = PPO("MlpPolicy", env, verbose=1, ent_coef=ENTROPY_COEF, device="cpu")
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_dir = f'log/ppo_obstacles_{DIM}_{OBSTACLES}_{MAX_STEPS}_{ENTROPY_COEF}_{timestamp}'
-    model_path = f'data/ppo_obstacles_{DIM}_{OBSTACLES}_{MAX_STEPS}_{ENTROPY_COEF}_{timestamp}.zip'
+    log_dir = f'log/ppo_obstacles_{DIM}_{OBSTACLES}_{MAX_STEPS}_{ENTROPY_COEF}_{timestamp}_{REWARD_VERSION}'
+    model_path = f'data/ppo_obstacles_{DIM}_{OBSTACLES}_{MAX_STEPS}_{ENTROPY_COEF}_{timestamp}_{REWARD_VERSION}.zip'
 
     new_logger = configure(log_dir, ["stdout", "csv", "tensorboard"])
     model.set_logger(new_logger)
