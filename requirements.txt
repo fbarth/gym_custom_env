@@ -4,5 +4,6 @@ typing
 stable-baselines3
 pygame
 tensorboard
+seaborn
 
 
