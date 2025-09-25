@@ -84,6 +84,14 @@ Para testar o agente treinado no ambiente com obstáculos, execute o comando:
 python train_grid_world_obstacles.py test
 ```
 
+Esta funcionalidade irá executar o agente treinado em 100 episódios e calcular o percentual de sucesso do agente, entre outras métricas. 
+
+Também é possível executar o agente treinado em um único episódio, para isso execute o comando:
+
+```bash
+python train_grid_world_obstacles.py run
+```
+
 ## Uso do ambiente GridWorld para problemas de Coverage Path Planning
 
 **Sugestão**: considerando a última versão do ambiente GridWorld, com renderização e obstáculos, altere a função de *reward* e o que mais for necessário para que o agente aprenda a fazer *Coverage Path Planning* (CPP) em um ambiente 2D com obstáculos.
