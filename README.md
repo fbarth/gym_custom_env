@@ -190,3 +190,5 @@ O ambiente CPP possui renderização visual com as seguintes indicações:
 ### Participantes
 
 - Rodrigo Medeiros
+- Pedro Civita
+- Gabriel Hermida
