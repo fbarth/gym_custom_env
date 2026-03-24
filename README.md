@@ -108,4 +108,85 @@ python train_grid_world_obstacles.py run
 
 ## Uso do ambiente GridWorld para problemas de Coverage Path Planning
 
-**Sugestão**: considerando a última versão do ambiente GridWorld, com renderização e obstáculos, altere a função de *reward* e o que mais for necessário para que o agente aprenda a fazer *Coverage Path Planning* (CPP) em um ambiente 2D com obstáculos.
+O **Coverage Path Planning (CPP)** é um problema de planejamento clássico onde o objetivo é encontrar um caminho que cubra todos os pontos acessíveis de uma área. Este problema tem aplicações em robótica (aspiradores autônomos), agricultura de precisão (drones de pulverização), e patrulhamento de áreas (veículos autônomos de superfície).
+
+Para adaptar o ambiente GridWorld para CPP, foi criado um novo ambiente (`grid_world_cpp.py`) baseado no ambiente com obstáculos, com as seguintes modificações na função de reward e no espaço de observação.
+
+### Função de Reward Original (GridWorld com obstáculos)
+
+No ambiente original, o objetivo do agente é **chegar ao alvo (goal)** o mais rápido possível. A função de reward é baseada na distância ao alvo:
+
+| Condição | Reward |
+|----------|--------|
+| Agente chega ao alvo | +10.0 |
+| A cada passo | `distância_anterior - distância_atual - 0.1` (recompensa shaping baseada na distância) |
+| Máximo de passos atingido sem chegar ao alvo | -10.0 |
+
+Esta função incentiva o agente a se aproximar do alvo a cada passo, com uma pequena penalidade por passo para encorajar eficiência.
+
+### Nova Função de Reward para CPP
+
+A nova função de reward foi projetada para incentivar a **exploração de novas células** e **punir a revisitação**, inspirada em abordagens de Deep Reinforcement Learning para problemas de patrulhamento e cobertura, como os descritos em:
+
+- *A Deep Reinforcement Learning Approach for the Patrolling Problem of Water Resources Through Autonomous Surface Vehicles: The Ypacarai Lake Case* (Yanes Luis et al.)
+- *A Comprehensive Survey on Coverage Path Planning for Mobile Robots in Dynamic Environments*
+
+| Condição | Reward |
+|----------|--------|
+| Visitar uma célula **nova** (não visitada) | +1.0 |
+| **Revisitar** uma célula já visitada | -0.3 |
+| Colidir com parede ou obstáculo (ficar no mesmo lugar) | -0.5 |
+| Penalidade por passo (a cada ação) | -0.1 |
+| **Cobertura completa** (todas as células livres visitadas) | +10.0 (bônus) |
+| Máximo de passos atingido sem cobertura completa | -5.0 |
+
+### Mudanças no Espaço de Observação
+
+O espaço de observação foi adaptado para o problema de CPP:
+
+| Componente | Descrição |
+|------------|-----------|
+| `agent_x`, `agent_y` | Posição atual do agente |
+| `coverage_ratio` | Proporção de células livres já visitadas (0.0 a 1.0) |
+| `neighbors` (4 valores) | Estado das 4 células vizinhas (0=livre, 1=obstáculo/parede) |
+
+Note que o **alvo (target) foi removido** do espaço de observação, pois no CPP não há um destino fixo — o objetivo é cobrir toda a área.
+
+### Como executar
+
+Para testar o ambiente CPP com um **agente aleatório** em um grid 5x5:
+
+```bash
+python run_grid_world_cpp.py
+```
+
+Para **treinar** um agente com PPO:
+
+```bash
+python train_grid_world_cpp.py train
+```
+
+Para **testar** o agente treinado em 100 episódios:
+
+```bash
+python train_grid_world_cpp.py test
+```
+
+Para **visualizar** o agente treinado em um único episódio:
+
+```bash
+python train_grid_world_cpp.py run
+```
+
+### Renderização
+
+O ambiente CPP possui renderização visual com as seguintes indicações:
+- **Verde claro**: células já visitadas
+- **Azul (círculo)**: posição atual do agente
+- **Preto**: obstáculos
+- **Branco**: células livres ainda não visitadas
+- **Texto no topo**: cobertura atual e número de passos
+
+### Participantes
+
+- Rodrigo Medeiros
