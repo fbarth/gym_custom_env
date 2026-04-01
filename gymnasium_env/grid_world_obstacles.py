@@ -36,6 +36,8 @@ class GridWorldRenderEnv(gym.Env):
         self.obstacles_locations = []
         self.count_steps = 0
         self.max_steps = max_steps
+        self.visited_cells = set()
+        self.total_free_cells = 0
 
         # Define the agent and target location; randomly chosen in `reset` and updated in `step`
         self._agent_location = np.array([-1, -1], dtype=int)
@@ -80,7 +82,10 @@ class GridWorldRenderEnv(gym.Env):
             "distance": np.linalg.norm(
                 self._agent_location - self._target_location, ord=1
             ),
-            "size": self.size
+            "size": self.size,
+            "visited_cells": len(self.visited_cells),
+            "total_free_cells": self.total_free_cells,
+            "coverage_ratio": len(self.visited_cells) / self.total_free_cells if self.total_free_cells > 0 else 0.0
         }
 
     def set_neighbors(self, obstacles_locations):
@@ -99,6 +104,7 @@ class GridWorldRenderEnv(gym.Env):
         super().reset(seed=seed)
         self.count_steps = 0
         self.obstacles_locations = []
+        self.visited_cells = set()
 
         # Choose the agent's location uniformly at random
         self._agent_location = self.np_random.integers(0, self.size, size=2, dtype=int)
@@ -118,6 +124,8 @@ class GridWorldRenderEnv(gym.Env):
                 obstacle_location = self.np_random.integers(0, self.size, size=2, dtype=int)
             self.obstacles_locations.append(obstacle_location)
 
+        self.total_free_cells = (self.size * self.size) - len(self.obstacles_locations)
+        self.visited_cells.add(tuple(self._agent_location))
         self.set_neighbors(self.obstacles_locations)
 
         observation = self._get_obs()
@@ -139,7 +147,6 @@ class GridWorldRenderEnv(gym.Env):
         direction = self._action_to_direction[action]
 
         # Store previous distance for reward calculation
-        prev_distance = self.distance(self._agent_location, self._target_location)
         old_location = self._agent_location.copy()
 
         # We use `np.clip` to make sure we don't leave the grid bounds
@@ -153,25 +160,24 @@ class GridWorldRenderEnv(gym.Env):
 
         self.set_neighbors(self.obstacles_locations)
 
-        # Calculate current distance
-        current_distance = self.distance(self._agent_location, self._target_location)
-
         self.count_steps += 1
+        current_cell = tuple(self._agent_location)
         
         # An environment is completed if and only if the agent has reached the target
-        terminated = np.array_equal(self._agent_location, self._target_location)
+        terminated = len(self.visited_cells) == self.total_free_cells
 
-        # Calculate reward based on distance
-        if terminated:
-            reward = 10.0
+        # Reward para CPP
+        if np.array_equal(self._agent_location, old_location):
+            reward = -1.0
+        elif current_cell not in self.visited_cells:
+            self.visited_cells.add(current_cell)
+            reward = 1.0
         else:
-            reward = prev_distance - current_distance - 0.1
+            reward = -0.5
 
-        if self.count_steps >= self.max_steps and not terminated:
-            truncated = True
-            reward = -10.0
-        else:
-            truncated = False
+        if len(self.visited_cells) == self.total_free_cells:
+            terminated = True
+            reward += 10.0    
 
         observation = self._get_obs()
         info = self._get_info()
@@ -179,7 +185,14 @@ class GridWorldRenderEnv(gym.Env):
         if self.render_mode == "human":
             self._render_frame()
 
+        if self.count_steps >= self.max_steps and not terminated:
+            truncated = True
+            reward = -10.0
+        else:
+            truncated = False
+
         return observation, reward, terminated, truncated, info
+    
     
     
     def render(self):

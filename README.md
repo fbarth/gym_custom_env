@@ -106,6 +106,28 @@ Também é possível executar o agente treinado em um único episódio, para iss
 python train_grid_world_obstacles.py run
 ```
 
-## Uso do ambiente GridWorld para problemas de Coverage Path Planning
+## Uso do ambiente GridWorld com obstáculos para Coverage Path Planning (CPP)
 
-**Sugestão**: considerando a última versão do ambiente GridWorld, com renderização e obstáculos, altere a função de *reward* e o que mais for necessário para que o agente aprenda a fazer *Coverage Path Planning* (CPP) em um ambiente 2D com obstáculos.
+Na versão original do ambiente GridWorld com obstáculos, o agente precisava se deslocar pelo grid evitando obstáculos até alcançar seu alvo. Nesse contexto, a função de *reward* era baseada principalmente na aproximação do agente em relação ao *target*.
+
+Agora, em CPP, o objetivo principal não é chegar a uma célula específica, mas sim cobrir o maior número possível de células livres do ambiente, reduzindo sobreposição de trajetórias e evitando revisitas desnecessárias. De certo modo, essa ideia se assemelha a problemas de caixeiro viajante.
+
+Por isso, a principal modificação realizada foi a reformulação do *reward*. Em vez de recompensar a redução da distância até um objetivo, a nova *reward* foi definida com base no comportamento de cobertura do agente:
+
+- o agente recebe recompensa positiva ao visitar uma célula livre ainda não visitada;
+- o agente recebe penalização ao revisitar uma célula que já havia sido coberta;
+- o agente recebe penalização ao tentar executar movimentos inválidos, como sair dos limites do grid ou colidir com obstáculos;
+- o agente recebe um bônus adicional quando consegue completar a cobertura de todas as células livres do ambiente.
+
+Além disso, também foi necessário alterar a condição de término do episódio. Na versão original, o episódio terminava quando o agente alcançava o *target*. Na nova versão para CPP, o episódio termina quando todas as células livres do grid tiverem sido cobertas, ou quando o número máximo de passos for atingido.
+
+Para permitir essa nova dinâmica, o ambiente passou a manter o registro das células já visitadas ao longo de cada episódio. Também foram adicionadas ao campo `info` informações auxiliares sobre cobertura, como o número de células visitadas, o total de células livres e a razão de cobertura, facilitando a análise do comportamento do agente durante os testes.
+
+O teste inicial foi realizado com um agente aleatório em um grid 5x5, conforme sugerido. Recapitulando, a ideia básica foi:
+- célula livre nova: recompensa positiva;
+- célula já visitada: penalização;
+- movimento inválido: penalização;
+- cobertura completa da área livre: bônus final.
+
+Concluindo, o ponto desta modificação foi transformar o ambiente original de navegação orientada por alvo em um ambiente mais adequado para problemas de *Coverage Path Planning*. Logo, redefinimos o objetivo do problema, criando uma base apropriada para futuros treinamentos e avaliações de agentes de *reinforcement learning* voltados à maximização de cobertura em ambientes com obstáculos.
+
