@@ -106,6 +106,62 @@ Também é possível executar o agente treinado em um único episódio, para iss
 python train_grid_world_obstacles.py run
 ```
 
-## Uso do ambiente GridWorld para problemas de Coverage Path Planning
+## Quinto exemplo: ambiente GridWorld para Coverage Path Planning (CPP)
 
-**Sugestão**: considerando a última versão do ambiente GridWorld, com renderização e obstáculos, altere a função de *reward* e o que mais for necessário para que o agente aprenda a fazer *Coverage Path Planning* (CPP) em um ambiente 2D com obstáculos.
+Coverage Path Planning (CPP) é um problema clássico onde o objetivo é encontrar um caminho que visite todas as células em um ambiente. Aplicações incluem robótica (limpeza autônoma, inspeção), logística (rotas de entrega), agricultura de precisão e vigilância.
+
+### Função de Reward para CPP
+
+A função de reward foi redesenhada para encorajar cobertura máxima:
+
+```python
+reward = -0.1  # Custo de movimento
+if célula_é_nova:
+    reward += 1.0  # Recompensa por célula nova
+else:
+    reward -= 1.0  # Penalidade por revisita
+if cobertura == 100%:
+    reward += 100.0  # Bônus por cobertura completa
+```
+
+### Como Usar
+
+**Teste com agente aleatório:**
+```bash
+python test_grid_world_cpp.py
+```
+
+**Teste com renderização visual:**
+```bash
+python run_grid_world_cpp.py
+```
+
+**Treinar um agente com PPO:**
+```bash
+python train_grid_world_cpp.py train
+```
+
+**Testar agente treinado:**
+```bash
+python train_grid_world_cpp.py test
+```
+
+**Demonstração com agente treinado:**
+```bash
+python train_grid_world_cpp.py run
+```
+Como executar:
+python test_grid_world_cpp.py              # Validar ambiente
+python run_grid_world_cpp.py               # Com renderização
+python train_grid_world_cpp.py train       # Treinar
+python train_grid_world_cpp.py test        # Testar
+python train_grid_world_cpp.py run         # Demo
+
+### Dados Técnicos
+
+- **Arquivo principal:** `gymnasium_env/grid_world_cpp.py` (classe `GridWorldCPPEnv`)
+- **Estado:** Dicionário com posição do agente, posição alvo e grid de células visitadas
+- **Ações:** 4 movimentos (direita, cima, esquerda, baixo)
+- **Renderização:** Pygame (células visitadas em cinza, agente em azul)
+
+Para mais detalhes sobre a implementação, consulte [CHANGES_CPP.md](CHANGES_CPP.md).
