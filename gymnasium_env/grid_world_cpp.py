@@ -12,7 +12,8 @@ import pygame
 #
 # Reward function (CPP):
 #   +1.0   for stepping onto a cell not yet visited (new coverage)
-#   -0.5   for stepping onto a cell already visited (revisit penalty)
+#   -0.5   for stepping onto a cell already visited (deliberate revisit penalty)
+#   -0.3   for bumping into a wall or obstacle (agent stays in place)
 #   +50.0  bonus when full coverage of all free cells is achieved
 #   -0.05  per step (efficiency incentive)
 #   -10.0  if max_steps is exhausted before full coverage
@@ -164,6 +165,7 @@ class GridWorldCPPEnv(gym.Env):
         if any(np.array_equal(new_location, loc) for loc in self.obstacles_locations):
             new_location = old_location
 
+        stayed_in_place = np.array_equal(new_location, old_location)
         self._agent_location = new_location
         self._set_neighbors()
         self.count_steps += 1
@@ -173,10 +175,12 @@ class GridWorldCPPEnv(gym.Env):
         self._visited_map[self._agent_location[0], self._agent_location[1]] = True
 
         reward = -0.05  # per-step cost
-        if is_new:
+        if stayed_in_place:
+            reward -= 0.3   # wall/obstacle bump: milder than a deliberate revisit
+        elif is_new:
             reward += 1.0   # reward for new coverage
         else:
-            reward -= 0.5   # revisit penalty
+            reward -= 0.5   # deliberate revisit penalty
 
         # Check termination: full coverage of all free cells
         terminated = int(self._visited_map.sum()) == self._free_cells

@@ -132,12 +132,13 @@ Para o CPP, **não existe alvo fixo**: o agente deve visitar todas as células l
 | Evento | Reward |
 |--------|--------|
 | Visitar uma célula **nova** (não visitada) | `+1.0` |
-| Revisitar uma célula já visitada | `−0.5` |
+| Revisitar uma célula já visitada (deliberadamente) | `−0.5` |
+| Colidir com parede ou obstáculo (agente fica parado) | `−0.3` |
 | Bônus por **cobertura total** de todas as células livres | `+50.0` |
 | Custo por passo (incentiva eficiência) | `−0.05` |
 | Esgotar `max_steps` sem cobertura total | `−10.0` |
 
-A combinação de recompensa positiva por célula nova e penalidade por revisita direciona o agente para explorar sistematicamente o grid em vez de circular pelas mesmas células. O bônus de `+50.0` ao concluir a cobertura é suficientemente alto para dominar a soma das recompensas individuais, garantindo que o agente aprenda a priorizar a conclusão da tarefa.
+A combinação de recompensa positiva por célula nova e penalidade por revisita direciona o agente para explorar sistematicamente o grid em vez de circular pelas mesmas células. A penalidade por colisão com parede/obstáculo (`−0.3`) é distinta e mais branda que a penalidade por revisita deliberada (`−0.5`), permitindo que o agente diferencie entre "tentei explorar mas fui bloqueado" e "escolhi ir a uma célula já visitada". O bônus de `+50.0` ao concluir a cobertura é suficientemente alto para dominar a soma das recompensas individuais, garantindo que o agente aprenda a priorizar a conclusão da tarefa.
 
 ### Observação estendida
 
