@@ -106,6 +106,71 @@ Também é possível executar o agente treinado em um único episódio, para iss
 python train_grid_world_obstacles.py run
 ```
 
-## Uso do ambiente GridWorld para problemas de Coverage Path Planning
+## Quinto exemplo: Coverage Path Planning (CPP)
 
-**Sugestão**: considerando a última versão do ambiente GridWorld, com renderização e obstáculos, altere a função de *reward* e o que mais for necessário para que o agente aprenda a fazer *Coverage Path Planning* (CPP) em um ambiente 2D com obstáculos.
+Coverage Path Planning (CPP) é um problema clássico de planejamento onde o objetivo é encontrar um caminho que cubra todas as células (ou pontos) de um ambiente. Aplicações incluem robótica de serviço (aspiração autônoma), mapeamento de terrenos, inspeção de infraestrutura e agricultura de precisão.
+
+### Função de reward original (navegação com obstáculos)
+
+O ambiente `grid_world_obstacles.py` foi projetado para que o agente **alcance um alvo fixo**. A função de reward é:
+
+| Evento | Reward |
+|--------|--------|
+| Alcançar o objetivo (target) | `+10.0` |
+| Cada passo (shaping de distância) | `prev_dist − cur_dist − 0.1` |
+| Esgotar `max_steps` sem alcançar o objetivo | `−10.0` |
+
+O shaping de distância (`prev_dist − cur_dist`) encoraja o agente a se aproximar do alvo a cada passo, ao mesmo tempo que o custo de `-0.1` por passo desincentiva rotas longas.
+
+### Nova função de reward (CPP)
+
+Para o CPP, **não existe alvo fixo**: o agente deve visitar todas as células livres do grid. A função de reward foi redesenhada com base nos trabalhos:
+
+- *A Deep Reinforcement Learning Approach for the Patrolling Problem of Water Resources Through Autonomous Surface Vehicles: The Ypacarai Lake Case* — que utiliza recompensas baseadas na novidade das células visitadas para incentivar cobertura distribuída.
+- *A Comprehensive Survey on Coverage Path Planning for Mobile Robots in Dynamic Environments* — que sistematiza estratégias de reward shaping para CPP, incluindo penalidades por revisita e bônus de conclusão.
+
+| Evento | Reward |
+|--------|--------|
+| Visitar uma célula **nova** (não visitada) | `+1.0` |
+| Revisitar uma célula já visitada | `−0.5` |
+| Bônus por **cobertura total** de todas as células livres | `+50.0` |
+| Custo por passo (incentiva eficiência) | `−0.05` |
+| Esgotar `max_steps` sem cobertura total | `−10.0` |
+
+A combinação de recompensa positiva por célula nova e penalidade por revisita direciona o agente para explorar sistematicamente o grid em vez de circular pelas mesmas células. O bônus de `+50.0` ao concluir a cobertura é suficientemente alto para dominar a soma das recompensas individuais, garantindo que o agente aprenda a priorizar a conclusão da tarefa.
+
+### Observação estendida
+
+O espaço de observação foi ampliado para fornecer ao agente informação sobre quais células já foram visitadas:
+
+```
+[agent_x, agent_y, visited_map[0..size×size−1], neighbors[0..3]]
+```
+
+O `visited_map` codifica: `1` = célula visitada, `0` = célula livre não visitada, `−1` = obstáculo.
+
+### Como executar
+
+Para visualizar o comportamento de um **agente aleatório** em um grid 5×5:
+
+```bash
+python run_grid_world_cpp.py
+```
+
+Para **treinar** um agente PPO no ambiente CPP:
+
+```bash
+python train_grid_world_cpp.py train
+```
+
+Para **testar** o agente treinado em 100 episódios (reporta taxa de cobertura completa e cobertura média):
+
+```bash
+python train_grid_world_cpp.py test
+```
+
+Para **visualizar** um único episódio com o agente treinado:
+
+```bash
+python train_grid_world_cpp.py run
+```
