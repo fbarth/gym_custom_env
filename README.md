@@ -106,6 +106,42 @@ Também é possível executar o agente treinado em um único episódio, para iss
 python train_grid_world_obstacles.py run
 ```
 
-## Uso do ambiente GridWorld para problemas de Coverage Path Planning
+## Uso do ambiente GridWorld para Coverage Path Planning (CPP)
 
-**Sugestão**: considerando a última versão do ambiente GridWorld, com renderização e obstáculos, altere a função de *reward* e o que mais for necessário para que o agente aprenda a fazer *Coverage Path Planning* (CPP) em um ambiente 2D com obstáculos.
+### Função de reward atual
+
+A função de reward original do ambiente é baseada na distância entre o agente e o objetivo (target).
+
+Regras:
+
+- O agente recebe **+10.0** ao atingir o objetivo.
+- Caso contrário, a reward é dada por:
+  
+  `reward = (distância anterior - distância atual) - 0.1`
+
+  Ou seja:
+  - o agente é recompensado ao se aproximar do objetivo;
+  - é penalizado ao se afastar;
+  - há uma penalidade fixa de **-0.1 por passo**.
+
+- Se o número máximo de passos for atingido sem alcançar o objetivo:
+  
+  `reward = -10.0`
+
+Essa função incentiva o agente a chegar ao objetivo o mais rápido possível. No entanto, ela não é adequada para problemas de Coverage Path Planning (CPP), pois não considera a exploração ou cobertura do ambiente.
+
+---
+
+## Nova função de reward proposta para CPP
+
+Para adaptar o ambiente ao problema de Coverage Path Planning (CPP), a função de reward foi reformulada para incentivar a cobertura do ambiente.
+
+A nova reward segue as seguintes regras:
+
+- O agente recebe **+1.0** ao visitar uma célula ainda não explorada.
+- O agente recebe **-0.2** ao revisitar uma célula já visitada.
+- O agente recebe **-1.0** ao tentar se mover para uma célula ocupada por obstáculo.
+- Existe uma penalidade de **-0.1 por passo**, incentivando eficiência.
+- O episódio termina quando todas as células livres do grid forem visitadas, com uma recompensa final de **+10.0**.
+
+Essa nova definição incentiva o agente a explorar o ambiente de forma eficiente, evitando revisitas desnecessárias e cobrindo o maior número possível de células.

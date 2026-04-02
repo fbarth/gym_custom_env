@@ -102,6 +102,8 @@ class GridWorldRenderEnv(gym.Env):
 
         # Choose the agent's location uniformly at random
         self._agent_location = self.np_random.integers(0, self.size, size=2, dtype=int)
+        self.visited_cells = set()
+        self.visited_cells.add(tuple(self._agent_location))
 
         # We will sample the target's location randomly until it does not coincide with the agent's location
         self._target_location = self._agent_location
@@ -153,19 +155,25 @@ class GridWorldRenderEnv(gym.Env):
 
         self.set_neighbors(self.obstacles_locations)
 
-        # Calculate current distance
-        current_distance = self.distance(self._agent_location, self._target_location)
-
         self.count_steps += 1
-        
-        # An environment is completed if and only if the agent has reached the target
-        terminated = np.array_equal(self._agent_location, self._target_location)
 
-        # Calculate reward based on distance
+        current_cell = tuple(self._agent_location)
+        free_cells = self.size * self.size - len(self.obstacles_locations)
+
+        if current_cell not in self.visited_cells:
+            reward = 1.0
+            self.visited_cells.add(current_cell)
+        else:
+            reward = -0.2
+
+        # Penalidade fixa por passo
+        reward -= 0.1
+
+        # O episódio termina quando todas as células livres foram visitadas
+        terminated = len(self.visited_cells) >= free_cells
+
         if terminated:
             reward = 10.0
-        else:
-            reward = prev_distance - current_distance - 0.1
 
         if self.count_steps >= self.max_steps and not terminated:
             truncated = True
