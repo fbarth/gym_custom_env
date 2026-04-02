@@ -109,3 +109,68 @@ python train_grid_world_obstacles.py run
 ## Uso do ambiente GridWorld para problemas de Coverage Path Planning
 
 **Sugestão**: considerando a última versão do ambiente GridWorld, com renderização e obstáculos, altere a função de *reward* e o que mais for necessário para que o agente aprenda a fazer *Coverage Path Planning* (CPP) em um ambiente 2D com obstáculos.
+
+---
+
+## Uso do ambiente GridWorld para Coverage Path Planning (CPP)
+
+> Esta seção substitui a proposta original da última seção do README.
+
+### Função de Reward Original (`grid_world_obstacles.py`)
+
+O ambiente original recompensa o agente por **chegar a um alvo fixo** o mais rápido possível:
+
+| Evento | Reward |
+|---|---|
+| Agente alcança o alvo | `+10.0` |
+| Cada passo executado | `(dist_anterior - dist_atual) - 0.1` |
+| Timeout (max_steps atingido) | `-10.0` |
+
+A componente `(dist_anterior - dist_atual)` é um *shaping reward* baseado na distância Manhattan/Euclidiana até o alvo, o que incentiva o agente a se aproximar do objetivo. Esta função é adequada para tarefas de **navegação ponto a ponto**, mas não incentiva exploração ou cobertura do grid.
+
+---
+
+### Nova Função de Reward para CPP (`grid_world_cpp.py`)
+
+Inspirada nos trabalhos:
+- Theile et al. (2020) — *A Deep Reinforcement Learning Approach for the Patrolling Problem of Water Resources Through ASVs*
+- Survey on Coverage Path Planning for Mobile Robots in Dynamic Environments (2025)
+
+O agente deve **cobrir todas as células acessíveis** do grid (sem obstáculos). Não existe mais um alvo fixo. Em vez disso, o estado inclui um mapa binário de células visitadas, e o episódio termina com sucesso quando 100% das células acessíveis forem visitadas.
+
+| Evento | Reward |
+|---|---|
+| Move para uma célula **nova** (não visitada) | `+1.0` |
+| Move para uma célula **já visitada** (revisita) | `-0.5` |
+| Penalidade de passo (a cada step) | `-0.05` |
+| Bônus de **cobertura total** (100% das células) | `+10.0` |
+| Timeout sem cobertura total | `-5.0` |
+
+A recompensa positiva por novas células incentiva exploração; a penalidade por revisita desincentiva caminhos redundantes; o bônus de cobertura total reforça o objetivo final.
+
+#### Como executar
+
+```bash
+# 1. Criar e ativar o ambiente virtual (primeira vez)
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# 2. Testar o ambiente com agente aleatório (com renderização)
+python run_grid_world_cpp.py
+
+# 3. Testar sem renderização (mais rápido, só métricas no terminal)
+python run_grid_world_cpp.py headless
+
+# 4. Treinar o agente PPO
+python train_grid_world_cpp.py train
+
+# 5. Avaliar o agente treinado (100 episódios, métricas no terminal)
+python train_grid_world_cpp.py test
+
+# 6. Visualizar o agente treinado (1 episódio com renderização)
+python train_grid_world_cpp.py run
+
+# 7. Acompanhar o treinamento via TensorBoard
+tensorboard --logdir log/grid_world_cpp
+```
