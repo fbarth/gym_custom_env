@@ -106,6 +106,97 @@ Também é possível executar o agente treinado em um único episódio, para iss
 python train_grid_world_obstacles.py run
 ```
 
-## Uso do ambiente GridWorld para problemas de Coverage Path Planning
+## Uso do ambiente GridWorld para problemas de Coverage Path Planning (CPP)
 
-**Sugestão**: considerando a última versão do ambiente GridWorld, com renderização e obstáculos, altere a função de *reward* e o que mais for necessário para que o agente aprenda a fazer *Coverage Path Planning* (CPP) em um ambiente 2D com obstáculos.
+O modelo do melhor agente está localizado em data/ppo_cpp_5_3_200_ent0.05_g0.995_20260401_202536.zip enquanto os logs estão em 
+log/ppo_cpp_5_3_200_ent0.05_g0.995_20260401_202536/
+
+O problema de CPP é, em sua forma mais simples, um problema onde tem-se um agente em um ambiente que deve ser totalmente explorado no menor número de passos possível. Nesse caso o ambiente é um grid 2D com 3 obstáculos com estado inicial aleatório.
+
+A função de reward foi modificada para treinar um agente para CPP, ela foi projetada para incentivar a cobertura da área de forma rápida e efeciente.
+
+```python
+reward = -0.1  # Custo de movimento
+if (not in_bounds) or hits_obstacle:
+            # Illegal move — agent stays in place
+            reward = -1.0
+            self.steps_since_new += 1
+        else:
+            self._agent_location = proposed.copy()
+            cell = (int(proposed[0]), int(proposed[1]))
+
+            if not self.visited[cell]:
+                # ✓ New cell — primary positive signal
+                self.visited[cell] = True
+                reward = 1.0
+                self.steps_since_new = 0
+            else:
+                # mild penalty; agent should be free to use visited
+                # cells as corridors without being heavily punished for it.
+                reward = -0.2
+                self.steps_since_new += 1
+
+        self.count_steps += 1
+
+        # ── Terminal condition ──────────────────────────────────────────────
+        terminated = bool(self.visited.sum() >= self.total_free_cells)
+        if terminated:
+            reward += 30.0      #completion bonus
+
+        # ── Per-step time penalty ───────────────────────────────────────────
+        reward -= 0.02
+
+        # ── Stagnation/Anti-Loop penalty ──────────────────────────────────────────────
+        # Kicks in after 7 consecutive steps without discovering a new cell.
+        if self.steps_since_new >= 7 and not terminated:
+            reward -= 0.5
+
+        # ── Truncation ──────────────────────────────────────────────────────
+        truncated = bool(self.count_steps >= self.max_steps and not terminated)
+        if truncated:
+            # -5 flat penalty + partial coverage credit
+            reward -= 5.0
+            reward += 10.0 * self._coverage_ratio()
+```
+
+Para treinar execute:
+
+```bash
+
+python train_grid_world_cpp.py train
+```
+
+Para medir o desempenho do agente treinado execute:
+
+```bash
+
+python train_grid_world_cpp.py test
+```
+
+Para visualizar o agente treinado execute:
+
+```bash
+
+python train_grid_world_cpp.py run
+```
+
+Para medir o desempenho de um agente aleatório execute:
+
+```bash
+
+python train_grid_world_cpp.py random
+```
+
+**Resultados Finais:**
+
+Métricas dos melhores agentes
+| Métrica | PPO(Stochastic) | PPO(Greedy)| Agente Aleatório |
+|---|:---:|:---:| :---:|
+| Porcetagem de Sucesso | 88.8% | 8.0% | 33.7% |
+| Área Média Explorada | 99.1% | 77.0% | 92.4% |
+| Área Mínima Explorada | 4.5% | 4.5% | 9.1% |
+| Área Máxima Explorada | 100% | 100% | 100% |
+| Quantidade Média de Passos | 77.9 | 183 | Não Medido|
+| Reard Médio | 20.3 | -93.1 | Não Medido |
+
+Para consultar mudanças feitas nos arquivos refira-se a Modifications.MD
