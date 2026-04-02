@@ -199,4 +199,11 @@ Métricas dos melhores agentes
 | Quantidade Média de Passos | 77.9 | 183 | Não Medido|
 | Reard Médio | 20.3 | -93.1 | Não Medido |
 
-Para consultar mudanças feitas nos arquivos refira-se a Modifications.MD
+A diferença de desempenho entre o agente greedy e o estocástico é explicada pelo comportamento de exploração das políticas.
+
+O agente greedy (determinístico) sempre seleciona a ação de maior probabilidade, o que frequentemente o leva a entrar em ciclos repetitivos e ficar preso em regiões já exploradas do ambiente. Como a política não realiza planejamento de longo prazo, ela não consegue sair desses loops sozinha.
+
+Por outro lado, o agente estocástico amostra ações da distribuição da política, permitindo ocasionalmente escolhas exploratórias. Isso possibilita escapar desses ciclos e alcançar regiões ainda não visitadas, resultando em maior cobertura e taxa de sucesso.
+
+
+Para consultar mudanças feitas nos arquivos refira-se a [MODIFICATIONS.MD](https://github.com/GabrielGalazzi/aps06_rl_gym_custom_env/blob/APS6-CPP-Galazzi/MODIFICATIONS.md)
