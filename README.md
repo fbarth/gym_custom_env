@@ -124,8 +124,8 @@ A implementação utilizada neste projeto está no ambiente `gymnasium_env/grid_
 - Conjunto de obstáculos: $\mathcal{O}$.
 - Ação $a_t \in \{0,1,2,3\}$ produz uma **próxima posição candidata** $s'_t = (i', j')$.
   - Se for **possível** (borda ou obstáculo), o agente **não se move**: $s_{t+1}=s_t$.
-  - Se **não** for **possível**, $s_{t+1}=s'_t$.
-- O episódio termina quando $s_{t+1}=g$ (*terminated*) ou quando $t \ge \text{max\_steps}$ (*truncated*).
+  - Se **não** for **possível**, ${s}_{t+1}={s'}_{t}$.
+- O episódio termina quando $s_{t+1}=g$ (*terminated*) ou quando $t \ge$ `max_steps` (*truncated*).
 
 ---
 
