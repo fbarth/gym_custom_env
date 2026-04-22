@@ -21,7 +21,9 @@ import pygame
 # The observation space includes:
 #   - Agent's (x, y) location
 #   - Coverage ratio (proportion of free cells visited)
-#   - State of 4 neighboring cells (0=free, 1=obstacle/wall)
+#   - A flattened 3x3 matrix of neighboring cells centered on the agent,
+#     where (1,1) is the agent's position and each cell is 0 (free) or 1 (obstacle/wall).
+#     Cells outside the grid boundaries are treated as walls (1).
 #
 # The episode ends when all free cells are visited or max steps is reached.
 #
@@ -42,13 +44,13 @@ class GridWorldCPPEnv(gym.Env):
         self.visited = set()
 
         self._agent_location = np.array([-1, -1], dtype=int)
-        self._neighbors = np.array([0, 0, 0, 0], dtype=int)  # right, up, left, down
+        self._neighbors = np.zeros((3, 3), dtype=int)  # 3x3 matrix centered on agent
 
-        # Observation: agent_x, agent_y, coverage_ratio, neighbors (4)
+        # Observation: agent_x, agent_y, coverage_ratio, flattened 3x3 neighbor matrix (9)
         # Using Box with float to accommodate the coverage ratio
         self.observation_space = gym.spaces.Box(
-            low=np.array([0, 0, 0.0, 0, 0, 0, 0], dtype=np.float32),
-            high=np.array([size - 1, size - 1, 1.0, 1, 1, 1, 1], dtype=np.float32),
+            low=np.array([0, 0, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, 0], dtype=np.float32),
+            high=np.array([size - 1, size - 1, 1.0, 1, 1, 1, 1, 1, 1, 1, 1, 1], dtype=np.float32),
             dtype=np.float32
         )
 
@@ -80,10 +82,7 @@ class GridWorldCPPEnv(gym.Env):
             self._agent_location[0],
             self._agent_location[1],
             self.coverage_ratio,
-            self._neighbors[0],
-            self._neighbors[1],
-            self._neighbors[2],
-            self._neighbors[3],
+            *self._neighbors.flatten(),
         ], dtype=np.float32)
 
     def _get_info(self):
@@ -96,14 +95,20 @@ class GridWorldCPPEnv(gym.Env):
         }
 
     def set_neighbors(self, obstacles_locations):
-        directions = [np.array([1, 0]), np.array([0, -1]), np.array([-1, 0]), np.array([0, 1])]
-        for i, direction in enumerate(directions):
-            neighbor = self._agent_location + direction
-            if (0 <= neighbor[0] < self.size) and (0 <= neighbor[1] < self.size) and \
-               not any(np.array_equal(neighbor, loc) for loc in obstacles_locations):
-                self._neighbors[i] = 0
-            else:
-                self._neighbors[i] = 1
+        # Create a 3x3 matrix centered on the agent's location.
+        # Row index i corresponds to agent_y + (i-1), col index j to agent_x + (j-1).
+        # 0 = free cell, 1 = obstacle or wall (including out-of-bounds).
+        matrix = np.zeros((3, 3), dtype=int)
+        for i in range(3):
+            for j in range(3):
+                nx = self._agent_location[0] + (j - 1)
+                ny = self._agent_location[1] + (i - 1)
+                neighbor = np.array([nx, ny])
+                if not (0 <= nx < self.size and 0 <= ny < self.size):
+                    matrix[i][j] = 1
+                elif any(np.array_equal(neighbor, loc) for loc in obstacles_locations):
+                    matrix[i][j] = 1
+        self._neighbors = matrix
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)

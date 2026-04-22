@@ -8,15 +8,14 @@ import pygame
 # This code is based on the example from Gymnasium: 
 # https://gymnasium.farama.org/introduction/create_custom_env/
 #
-# This environment implements a simple grid world with obstacles. 
+# This environment implements a simple grid world without obstacles. 
 # The agent (blue circle) must reach the target (red square) in as few steps as possible.
 #
 # The state is represented as a flattened array containing:
 # - the agent's (x, y) location
 # - the target's (x, y) location
-# - a flattened 3x3 matrix of the neighboring cells centered on the agent,
-#   where (1,1) is the agent's position and each cell is 0 (free) or 1 (obstacle/wall).
-#   Cells outside the grid boundaries are treated as walls (1).
+# - the state of the 4 neighboring cells (up, down, left, right),
+#   where 0 indicates a free cell and 1 indicates an obstacle or wall.
 #
 # The action space is discrete with 4 actions: move right, up, left, down.
 #
@@ -41,10 +40,10 @@ class GridWorldRenderEnv(gym.Env):
         # Define the agent and target location; randomly chosen in `reset` and updated in `step`
         self._agent_location = np.array([-1, -1], dtype=int)
         self._target_location = np.array([-1, -1], dtype=int)
-        self._neighbors = np.zeros((3, 3), dtype=int)  # 3x3 matrix centered on agent
+        self._neighbors = np.array([0,0,0,0], dtype=int)  #up, down, left, right
 
-        # The state is represented with the agent's and target's location and the 3x3 neighbor matrix
-        self.observation_space = gym.spaces.Box(0, size - 1, shape=(2 + 2 + 9,), dtype=int)
+        # The state is represented with the agent's and target's location and the grid of neighbors
+        self.observation_space = gym.spaces.Box(0, size - 1, shape=(2 + 2 + 4,), dtype=int)
 
         # We have 4 actions, corresponding to "right", "up", "left", "down"
         self.action_space = gym.spaces.Discrete(4)
@@ -73,7 +72,7 @@ class GridWorldRenderEnv(gym.Env):
         flattened = []
         flattened.extend(self._agent_location)
         flattened.extend(self._target_location)
-        flattened.extend(self._neighbors.flatten())
+        flattened.extend(self._neighbors)
         return np.array(flattened, dtype=int)
 
     def _get_info(self):
@@ -85,20 +84,15 @@ class GridWorldRenderEnv(gym.Env):
         }
 
     def set_neighbors(self, obstacles_locations):
-        # Create a 3x3 matrix centered on the agent's location.
-        # Row index i corresponds to agent_y + (i-1), col index j to agent_x + (j-1).
-        # 0 = free cell, 1 = obstacle or wall (including out-of-bounds).
-        matrix = np.zeros((3, 3), dtype=int)
-        for i in range(3):
-            for j in range(3):
-                nx = self._agent_location[0] + (j - 1)
-                ny = self._agent_location[1] + (i - 1)
-                neighbor = np.array([nx, ny])
-                if not (0 <= nx < self.size and 0 <= ny < self.size):
-                    matrix[i][j] = 1
-                elif any(np.array_equal(neighbor, loc) for loc in obstacles_locations):
-                    matrix[i][j] = 1
-        self._neighbors = matrix
+        # create a map of the neighbors
+        # 1 = free, 0 = obstacle or wall
+        directions = [np.array([1, 0]), np.array([0, -1]), np.array([-1, 0]), np.array([0, 1])]
+        for i, direction in enumerate(directions):
+            neighbor = self._agent_location + direction
+            if (0 <= neighbor[0] < self.size) and (0 <= neighbor[1] < self.size) and not any(np.array_equal(neighbor, loc) for loc in obstacles_locations):
+                self._neighbors[i] = 0
+            else:
+                self._neighbors[i] = 1
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         # We need the following line to seed self.np_random
