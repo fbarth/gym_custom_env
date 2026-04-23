@@ -47,6 +47,8 @@ for ep in range(NUM_EPISODES):
         print(f"Step {step:3d} | Action: {get_direction(action):5s} | "
               f"Reward: {reward:+6.2f} | Coverage: {info['coverage']:.1%} | "
               f"Visited: {info['visited_cells']}/{info['total_free_cells']}")
+        
+        print(f"  State: {next_state}")
 
         done = terminated or truncated
 

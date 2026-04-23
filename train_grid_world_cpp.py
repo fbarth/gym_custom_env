@@ -36,7 +36,7 @@ except Exception:
 DIM = 5
 OBSTACLES = 3
 MAX_STEPS = 200
-TOTAL_TIMESTEPS = 200_000
+TOTAL_TIMESTEPS = 500_000
 ENTROPY_COEF = 0.05
 # -----------------------
 
@@ -51,7 +51,7 @@ if mode == 'train':
     )
     check_env(env)
 
-    model = PPO("MlpPolicy", env, verbose=1, ent_coef=ENTROPY_COEF, device="cpu")
+    model = PPO("MultiInputPolicy", env, verbose=1, ent_coef=ENTROPY_COEF, device="cpu")
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_dir = f'log/ppo_cpp_{DIM}_{OBSTACLES}_{MAX_STEPS}_{ENTROPY_COEF}_{timestamp}'

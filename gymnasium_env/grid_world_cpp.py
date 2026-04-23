@@ -19,10 +19,12 @@ import pygame
 #   - -5.0 penalty when max steps reached without full coverage
 #
 # The observation space includes:
-#   - Agent's (x, y) location
+#   - Agent's (x, y) location (normalized)
 #   - Coverage ratio (proportion of free cells visited)
-#   - A flattened 3x3 matrix of neighboring cells centered on the agent,
-#     where (1,1) is the agent's position and each cell is 0 (free) or 1 (obstacle/wall).
+#   - A 3x3 matrix of neighboring cells centered on the agent,
+#     where (1,1) is the agent's position and each cell is:
+#       0 = free (not yet visited), 1 = obstacle or wall (including out-of-bounds),
+#       2 = already visited position.
 #     Cells outside the grid boundaries are treated as walls (1).
 #
 # The episode ends when all free cells are visited or max steps is reached.
@@ -46,13 +48,19 @@ class GridWorldCPPEnv(gym.Env):
         self._agent_location = np.array([-1, -1], dtype=int)
         self._neighbors = np.zeros((3, 3), dtype=int)  # 3x3 matrix centered on agent
 
-        # Observation: agent_x, agent_y, coverage_ratio, flattened 3x3 neighbor matrix (9)
-        # Using Box with float to accommodate the coverage ratio
-        self.observation_space = gym.spaces.Box(
-            low=np.array([0, 0, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, 0], dtype=np.float32),
-            high=np.array([size - 1, size - 1, 1.0, 1, 1, 1, 1, 1, 1, 1, 1, 1], dtype=np.float32),
-            dtype=np.float32
-        )
+        # Observation: Dict with agent info (x, y, coverage) and 3x3 neighbor matrix
+        self.observation_space = gym.spaces.Dict({
+            "agent": gym.spaces.Box(
+                low=np.array([0.0, 0.0, 0.0], dtype=np.float32),
+                high=np.array([1.0, 1.0, 1.0], dtype=np.float32),
+                dtype=np.float32
+            ),
+            "neighbors": gym.spaces.Box(
+                low=np.zeros((3, 3), dtype=np.float32),
+                high=np.full((3, 3), 2.0, dtype=np.float32),
+                dtype=np.float32
+            ),
+        })
 
         # 4 actions: right, up, left, down
         self.action_space = gym.spaces.Discrete(4)
@@ -78,12 +86,14 @@ class GridWorldCPPEnv(gym.Env):
         return len(self.visited) / self.total_free_cells if self.total_free_cells > 0 else 1.0
 
     def _get_obs(self):
-        return np.array([
-            self._agent_location[0],
-            self._agent_location[1],
-            self.coverage_ratio,
-            *self._neighbors.flatten(),
-        ], dtype=np.float32)
+        return {
+            "agent": np.array([
+                self._agent_location[0] / self.size,
+                self._agent_location[1] / self.size,
+                self.coverage_ratio,
+            ], dtype=np.float32),
+            "neighbors": self._neighbors.astype(np.float32),
+        }
 
     def _get_info(self):
         return {
@@ -97,7 +107,7 @@ class GridWorldCPPEnv(gym.Env):
     def set_neighbors(self, obstacles_locations):
         # Create a 3x3 matrix centered on the agent's location.
         # Row index i corresponds to agent_y + (i-1), col index j to agent_x + (j-1).
-        # 0 = free cell, 1 = obstacle or wall (including out-of-bounds).
+        # 0 = free (not yet visited), 1 = obstacle or wall (out-of-bounds), 2 = already visited.
         matrix = np.zeros((3, 3), dtype=int)
         for i in range(3):
             for j in range(3):
@@ -108,6 +118,8 @@ class GridWorldCPPEnv(gym.Env):
                     matrix[i][j] = 1
                 elif any(np.array_equal(neighbor, loc) for loc in obstacles_locations):
                     matrix[i][j] = 1
+                elif (nx, ny) in self.visited:
+                    matrix[i][j] = 2
         self._neighbors = matrix
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
