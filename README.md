@@ -112,19 +112,7 @@ O **Coverage Path Planning (CPP)** é um problema de planejamento clássico onde
 
 Para adaptar o ambiente GridWorld para CPP, foi criado um novo ambiente (`grid_world_cpp.py`) baseado no ambiente com obstáculos, com as seguintes modificações na função de reward e no espaço de observação.
 
-### Função de Reward Original (GridWorld com obstáculos)
-
-No ambiente original, o objetivo do agente é **chegar ao alvo (goal)** o mais rápido possível. A função de reward é baseada na distância ao alvo:
-
-| Condição | Reward |
-|----------|--------|
-| Agente chega ao alvo | +10.0 |
-| A cada passo | `distância_anterior - distância_atual - 0.1` (recompensa shaping baseada na distância) |
-| Máximo de passos atingido sem chegar ao alvo | -10.0 |
-
-Esta função incentiva o agente a se aproximar do alvo a cada passo, com uma pequena penalidade por passo para encorajar eficiência.
-
-### Nova Função de Reward para CPP
+### Função de Reward para CPP
 
 A nova função de reward foi projetada para incentivar a **exploração de novas células** e **punir a revisitação**, inspirada em abordagens de Deep Reinforcement Learning para problemas de patrulhamento e cobertura, como os descritos em:
 
@@ -140,17 +128,17 @@ A nova função de reward foi projetada para incentivar a **exploração de nova
 | **Cobertura completa** (todas as células livres visitadas) | +10.0 (bônus) |
 | Máximo de passos atingido sem cobertura completa | -5.0 |
 
-### Mudanças no Espaço de Observação
+### Espaço de Observação
 
-O espaço de observação foi adaptado para o problema de CPP:
+O espaço de observação para este ambiente é:
 
-| Componente | Descrição |
-|------------|-----------|
-| `agent_x`, `agent_y` | Posição atual do agente |
-| `coverage_ratio` | Proporção de células livres já visitadas (0.0 a 1.0) |
-| `neighbors` (4 valores) | Estado das 4 células vizinhas (0=livre, 1=obstáculo/parede) |
-
-Note que o **alvo (target) foi removido** do espaço de observação, pois no CPP não há um destino fixo — o objetivo é cobrir toda a área.
+* Localização do agente normalizado com relação a dimensão do grid (x/dim, y/dim)
+* Razão de células livres visitadas ou cobertura (células visitadas / total de células)
+* Uma matriz 3x3 representando as células vizinhas ao redor do agente, onde (1,1) é a posição do agente e cada célula é:
+  - 0 = livre (ainda não visitada)
+  - 1 = obstáculo ou parede (incluindo limites fora do grid)
+  - 2 = posição já visitada
+  - Células fora dos limites do grid são tratadas como paredes (1).
 
 ### Como executar
 
@@ -187,8 +175,3 @@ O ambiente CPP possui renderização visual com as seguintes indicações:
 - **Branco**: células livres ainda não visitadas
 - **Texto no topo**: cobertura atual e número de passos
 
-### Participantes
-
-- Rodrigo Medeiros
-- Pedro Civita
-- Gabriel Hermida
