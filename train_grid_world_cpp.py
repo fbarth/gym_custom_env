@@ -33,10 +33,10 @@ except Exception:
     pass
 
 # --- Hyperparameters ---
-DIM = 5
-OBSTACLES = 3
+DIM = 10 # 5, 20
+OBSTACLES = 12
 MAX_STEPS = 200
-TOTAL_TIMESTEPS = 500_000
+TOTAL_TIMESTEPS = 1_000_000
 ENTROPY_COEF = 0.05
 # -----------------------
 
@@ -120,7 +120,7 @@ elif mode == 'test':
         truncated = False
         steps = 0
         while not done and not truncated:
-            action, _ = model.predict(obs, deterministic=True)
+            action, _ = model.predict(obs, deterministic=False)
             obs, reward, done, truncated, info = env.step(action.item())
             steps += 1
 
@@ -136,8 +136,10 @@ elif mode == 'test':
     import numpy as np
     full_coverage_rate = (full_coverage_count / num_episodes) * 100
     avg_coverage = np.mean(total_coverages) * 100
+    standard_deviation = np.std(total_coverages) * 100
     avg_steps = np.mean(total_steps_list)
+    standard_deviation_steps = np.std(total_steps_list)
     print(f"\n--- Test Finished ---")
     print(f"Full Coverage Rate: {full_coverage_rate:.2f}% ({full_coverage_count}/{num_episodes})")
-    print(f"Average Coverage: {avg_coverage:.2f}%")
-    print(f"Average Steps: {avg_steps:.1f}")
+    print(f"Average Coverage: {avg_coverage:.2f}% Standard Deviation: {standard_deviation:.2f}% Min Coverage: {np.min(total_coverages)*100:.2f}% Max Coverage: {np.max(total_coverages)*100:.2f}%")
+    print(f"Average Steps: {avg_steps:.1f} Standard Deviation: {standard_deviation_steps:.1f} Min Steps: {np.min(total_steps_list)} Max Steps: {np.max(total_steps_list)}")
