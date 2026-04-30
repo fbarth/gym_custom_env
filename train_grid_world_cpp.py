@@ -30,11 +30,14 @@ elif sys.argv[1] in ['test', 'run']:
         print("Usage for testing/running: python train_grid_world_cpp.py test|run dim obstacles")
         sys.exit(1)
 
+# --- Hyperparameters ---
 mode = sys.argv[1]
 DIM = int(sys.argv[2]) # 5, 10, 20
 OBSTACLES = int(sys.argv[3]) # 3, 12, 48
 MAX_STEPS = int(sys.argv[4]) # 200, 500, 1000
 TOTAL_TIMESTEPS = int(sys.argv[5]) # 500_000
+ENTROPY_COEF = 0.05
+# -----------------------
 
 try:
     gym.register(
@@ -44,13 +47,7 @@ try:
 except Exception:
     pass
 
-# --- Hyperparameters ---
-DIM = 10 #, 20
-OBSTACLES = 12
-MAX_STEPS = 500
-TOTAL_TIMESTEPS = 500_000
-ENTROPY_COEF = 0.05
-# -----------------------
+
 
 if mode == 'train':
     print("--- Starting CPP Training ---")
