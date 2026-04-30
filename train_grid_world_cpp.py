@@ -1,5 +1,5 @@
 #
-# python train_grid_world_cpp.py <train|test|run>
+# python train_grid_world_cpp.py <train|test|run|curriculum> dim obstacles max_steps total_timesteps
 #
 
 import gymnasium as gym
@@ -18,11 +18,23 @@ def print_action(action: int) -> str:
         3: "down",
     }.get(action, "unknown")
 
-if len(sys.argv) < 2 or sys.argv[1] not in ['train', 'test', 'run', 'curriculum']:
-    print("Usage: python train_grid_world_cpp.py <train|test|run|curriculum>")
+if sys.argv[1] not in ['train', 'test', 'run', 'curriculum']:
+    print("Usage: python train_grid_world_cpp.py <train|test|run|curriculum> dim obstacles max_steps total_timesteps")
     sys.exit(1)
+elif sys.argv[1] in ['train','curriculum']:
+    if len(sys.argv) != 6:
+        print("Usage for training: python train_grid_world_cpp.py train|curriculum dim obstacles max_steps total_timesteps")
+        sys.exit(1)
+elif sys.argv[1] in ['test', 'run']:
+    if len(sys.argv) != 4:
+        print("Usage for testing/running: python train_grid_world_cpp.py test|run dim obstacles")
+        sys.exit(1)
 
 mode = sys.argv[1]
+DIM = int(sys.argv[2]) # 5, 10, 20
+OBSTACLES = int(sys.argv[3]) # 3, 12, 48
+MAX_STEPS = int(sys.argv[4]) # 200, 500, 1000
+TOTAL_TIMESTEPS = int(sys.argv[5]) # 500_000
 
 try:
     gym.register(
