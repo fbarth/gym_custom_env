@@ -5,3 +5,7 @@ stable-baselines3
 pygame
 tensorboard
 seaborn
+sb3-contrib>=2.3.0
+pytest>=8.0.0
+pandas>=2.0.0
+matplotlib>=3.7.0
