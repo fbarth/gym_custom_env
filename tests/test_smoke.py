@@ -5,12 +5,10 @@ import pytest
 from gymnasium_env.grid_world_cpp import GridWorldCPPEnv
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="session")
 def register_env():
-    try:
+    if "gymnasium_env/GridWorldCPP-v0" not in gym.envs.registry:
         gym.register(id="gymnasium_env/GridWorldCPP-v0", entry_point=GridWorldCPPEnv)
-    except gym.error.Error:
-        pass
 
 
 def test_env_resets_and_steps():
