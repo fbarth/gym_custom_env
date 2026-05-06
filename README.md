@@ -116,6 +116,12 @@ A fase 5x5 é idêntica ao baseline (treinada do zero). Nas fases 10x10 e 20x20,
 
 Comportamento parecido com curriculum, mas com a observação 5x5 + features de direção/distância para a célula não-visitada mais próxima na janela.
 
+### Curriculum + RecurrentPPO (LSTM)
+
+![recurrent](results/plots/learning_curve_curriculum_recurrent.png)
+
+Curriculum também, mas com `RecurrentPPO` do `sb3-contrib` no lugar do PPO. A política troca o MLP por uma LSTM de 64 unidades. Treinamento mais lento por dois motivos: `n_envs=2` (vs 4 nas configs MLP) e overhead da LSTM por step. Cada seed roda em ~2.5h vs ~1h das configs MLP.
+
 ## Resultados de Inferência
 
 100 episódios por modelo, política estocástica. Cada modelo treinado num tamanho é avaliado nos três. Todos os números são médias sobre 3 seeds. A diagonal é a performance "nativa" (mesmo tamanho); os off-diagonais medem generalização.
@@ -178,17 +184,37 @@ A linha 5x5 é idêntica ao baseline porque a primeira fase do curriculum não t
 
 A célula mais surpreendente é o 5x5/10x10: 69.7% (vs 14.0% do baseline e do curriculum). A janela 5x5 + a feature `direction_to_nearest_unvisited` fazem o modelo treinado só em 5x5 generalizar quase tão bem em 10x10 quanto em 5x5. Isso é resultado de **estrutura na observação**, não de mais treino.
 
+### Curriculum + RecurrentPPO
+
+#### Full coverage rate
+
+| Treinado em ↓ \ Avaliado em → | 5x5 | 10x10 | 20x20 |
+|---|---|---|---|
+| 5x5 | **83.0%** | 0.0% | 0.0% |
+| 10x10 | 64.7% | **1.3%** | 0.0% |
+| 20x20 | 85.0% | 19.3% | **0.0%** |
+
+#### Avg coverage
+
+| Treinado em ↓ \ Avaliado em → | 5x5 | 10x10 | 20x20 |
+|---|---|---|---|
+| 5x5 | **98.3%** | 85.4% | 56.0% |
+| 10x10 | 96.6% | **88.0%** | 69.7% |
+| 20x20 | 98.5% | 95.6% | **86.2%** |
+
+O recurrent regrediu em quase todas as células comparado ao baseline. A única exceção parcial é o 20x20→5x5 (85.0% vs 87.3% do baseline) e a avg coverage no 20x20 (86.2% vs 94.1% do baseline). O 10x10 native colapsou de 64.3% para 1.3%, e o 5x5/10x10 caiu de 14.0% para 0.0%. Discussão mais adiante.
+
 ## Análise
 
-Comparando as três configurações nas células-chave (linha de comparação direta com o enunciado):
+Comparando as quatro configurações nas células-chave (linha de comparação direta com o enunciado):
 
-| Treinado em ↓ \ Avaliado em → | Baseline | Curriculum | Enriched |
-|---|---|---|---|
-| 5x5 → 10x10 | 14.0% | 14.0% | **69.7%** |
-| 10x10 → 10x10 | 64.3% | 71.3% | **77.3%** |
-| 20x20 → 10x10 | 47.7% | 64.7% | **73.0%** |
-| 20x20 → 20x20 | 0.3% | 0.3% | **9.0%** |
-| 5x5 → 5x5 | 92.7% | 92.7% | 91.3% |
+| Treinado em ↓ \ Avaliado em → | Baseline | Curriculum | Enriched | Recurrent |
+|---|---|---|---|---|
+| 5x5 → 10x10 | 14.0% | 14.0% | **69.7%** | 0.0% |
+| 10x10 → 10x10 | 64.3% | 71.3% | **77.3%** | 1.3% |
+| 20x20 → 10x10 | 47.7% | 64.7% | **73.0%** | 19.3% |
+| 20x20 → 20x20 | 0.3% | 0.3% | **9.0%** | 0.0% |
+| 5x5 → 5x5 | 92.7% | 92.7% | 91.3% | 83.0% |
 
 Cada hipótese da seção "O Problema da Generalização" se mapeia num resultado:
 
@@ -196,7 +222,7 @@ Cada hipótese da seção "O Problema da Generalização" se mapeia num resultad
 
 **Hipótese 2: janela 3x3 fica pequena em grids grandes + falta de pista direcional.** É aqui que o enriched faz diferença. O 5x5/10x10 vai de 14% para 70% sem precisar de curriculum, ou seja, é ganho estrutural. A janela 5x5 mostra mais células, e `direction_to_nearest_unvisited` resolve o "para onde devo ir" que a janela 3x3 sozinha não responde. Esta era a hipótese certa para a generalização entre 5x5 e 10x10.
 
-**Hipótese 3: agente esquece células visitadas fora da janela.** Será testada com a config `curriculum_recurrent`, que substitui o MLP por um LSTM. O treino dela está em curso e a seção de resultados é atualizada conforme os experimentos terminam.
+**Hipótese 3: agente esquece células visitadas fora da janela.** Foi testada com a config `curriculum_recurrent`, que substitui o MLP por um LSTM de 64 unidades. O resultado foi negativo: o recurrent **regrediu** em quase todas as células, com o 10x10 native colapsando para 1.3% e o 5x5/10x10 zerando. A avg coverage continua alta (84-98%), então o agente ainda explora, mas não fecha. Provável causa: o LSTM precisa de mais timesteps por update do que os 300k/800k/2M alocados (n_steps default × n_envs=2 dá rollouts curtos demais para o LSTM aprender dependências temporais), e o `RecurrentPPO.load(path, env=novo_env)` entre as fases do curriculum pode quebrar o regime do hidden state. Memória pode ser parte do problema, mas o nosso orçamento de compute não foi suficiente para provar isso. Resultado vai pra "trabalhos futuros".
 
 ### O bônus 20x20
 
@@ -205,6 +231,17 @@ O 20x20 native continua difícil mesmo com enriched (9.0%). O salto de 0.3% para
 ### Trade-off de avg coverage vs full coverage rate
 
 Avg coverage fica em 94-99% em todas as configurações e em todos os tamanhos. O agente encontra a maioria das células. O que diferencia as estratégias é a capacidade de **fechar** a cobertura, ou seja, encontrar as últimas 1-5 células antes do `max_steps`. Esse é um problema de eficiência, não de exploração.
+
+### Como interpretar o critério "cobertura próxima de 100%" do enunciado
+
+O enunciado pede que o agente atinja "cobertura próxima de 100%" em 5x5 e 10x10 (e em 20x20 para o bônus), mas usa duas leituras diferentes do que isso significa ao longo do texto. Ao descrever o baseline atual, ele cita números no formato `75/100, 78/100`, ou seja, a métrica **Full Coverage Rate**: a fração dos episódios em que o agente cobriu literalmente todas as células livres. No critério-alvo o termo é só "cobertura", sem qualificar.
+
+Em uma corrida de 100 episódios em 20x20 com a config `enriched`, o agente cobre em média 97.3% das células de cada episódio (97 de 100 células livres em média). Mas só 9 desses 100 episódios são fechados completamente. As duas medidas dizem coisas diferentes:
+
+- **Avg coverage** mede o quanto da tarefa o agente consegue concluir em média. Boa para diagnóstico (mostra que ele explora bem).
+- **Full coverage rate** mede com que frequência o agente fecha a tarefa por completo. Boa para comparação binária com baselines do enunciado.
+
+Como a métrica que o professor usa para descrever os resultados do baseline é **Full Coverage Rate**, esta é a leitura mais conservadora do critério. As tabelas do README reportam **as duas** lado a lado para evitar ambiguidade. O ranking das estratégias e a discussão da seção `Análise` se baseiam em Full Coverage Rate por consistência com o baseline citado pelo enunciado.
 
 ## Bônus 20x20
 
