@@ -25,6 +25,7 @@ from broom.configs import (
     PHASE_TIMESTEPS,
     PPO_HYPERPARAMS,
     RECURRENT_HYPERPARAMS,
+    RECURRENT_V2_HYPERPARAMS,
     ConfigName,
     GridSize,
     get_phase_n_envs,
@@ -110,7 +111,13 @@ class _EpisodeLogger(BaseCallback):
 
 
 def _is_recurrent(config_name: ConfigName) -> bool:
-    return config_name == "curriculum_recurrent"
+    return config_name in ("curriculum_recurrent", "curriculum_recurrent_v2")
+
+
+def _recurrent_hyperparams(config_name: ConfigName) -> dict:
+    if config_name == "curriculum_recurrent_v2":
+        return RECURRENT_V2_HYPERPARAMS
+    return RECURRENT_HYPERPARAMS
 
 
 def train_one(
@@ -143,17 +150,23 @@ def train_one(
 
     callback = _EpisodeLogger(curve_path)
 
+    # verbose=1 prints per-rollout stats (~once every n_steps timesteps).
+    # Negligible cost in wall-clock; useful for diagnosing fps, reward trend,
+    # and entropy/KL during long runs.
+    verbose = int(os.environ.get("APS07_TRAIN_VERBOSE", "1"))
+
     if _is_recurrent(config_name):
         from sb3_contrib import RecurrentPPO
+        hp = _recurrent_hyperparams(config_name)
         if init_from is not None:
-            model = RecurrentPPO.load(init_from, env=vec_env, **RECURRENT_HYPERPARAMS)
+            model = RecurrentPPO.load(init_from, env=vec_env, verbose=verbose, **hp)
         else:
-            model = RecurrentPPO("MultiInputLstmPolicy", vec_env, seed=seed, **RECURRENT_HYPERPARAMS)
+            model = RecurrentPPO("MultiInputLstmPolicy", vec_env, seed=seed, verbose=verbose, **hp)
     else:
         if init_from is not None:
-            model = PPO.load(init_from, env=vec_env, **PPO_HYPERPARAMS)
+            model = PPO.load(init_from, env=vec_env, verbose=verbose, **PPO_HYPERPARAMS)
         else:
-            model = PPO("MultiInputPolicy", vec_env, seed=seed, **PPO_HYPERPARAMS)
+            model = PPO("MultiInputPolicy", vec_env, seed=seed, verbose=verbose, **PPO_HYPERPARAMS)
 
     model.learn(total_timesteps=timesteps, reset_num_timesteps=(init_from is None), callback=callback)
     model.save(str(model_path))
