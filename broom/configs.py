@@ -13,6 +13,7 @@ ConfigName = Literal[
     "curriculum_enriched",
     "curriculum_recurrent",
     "curriculum_recurrent_v2",
+    "mapcnn_bc_pbrs",
 ]
 GridSize = Literal[5, 10, 20]
 
@@ -87,6 +88,28 @@ RECURRENT_V2_HYPERPARAMS = {
         "n_lstm_layers": 1,
     },
 }
+
+
+# Map-CNN + BC + PBRS (Epic 7) — uses the egocentric accumulated map env,
+# a CNN feature extractor (auto-routed by SB3 MultiInputPolicy on the 3D Box
+# `ego_map` channel), BC warm-start from the FrontierAgent expert, and
+# potential-based reward shaping with potential = coverage_ratio at training
+# time only. Long-horizon-friendly hyperparams: gamma=0.999, n_steps=1024.
+MAPCNN_BC_PBRS_HYPERPARAMS = {
+    "ent_coef": 0.05,
+    "device": "cuda",
+    "n_steps": 1024,
+    "gamma": 0.999,
+    "gae_lambda": 0.95,
+}
+
+# Path of the BC-trained checkpoint that warm-starts the first phase
+# (5x5) of the curriculum for `mapcnn_bc_pbrs`. Generated once by
+# `python -m broom.bc_pipeline` and reused across seeds.
+BC_WARMSTART_PATH = "results/models/bc_warmstart.zip"
+
+# Discount used inside the PBRS shaping wrapper. Matches the PPO gamma above.
+PBRS_GAMMA = 0.999
 
 
 # Curriculum chain: each entry is (size, init_from_size or None)

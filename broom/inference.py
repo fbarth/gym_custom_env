@@ -29,11 +29,19 @@ def _register_envs():
             gym.register(id="gymnasium_env/GridWorldCPPEnriched-v0", entry_point=GridWorldCPPEnrichedEnv)
     except ImportError:
         pass
+    try:
+        from gymnasium_env.grid_world_cpp_mapobs import GridWorldCPPMapObsEnv
+        if "gymnasium_env/GridWorldCPPMapObs-v0" not in gym.envs.registry:
+            gym.register(id="gymnasium_env/GridWorldCPPMapObs-v0", entry_point=GridWorldCPPMapObsEnv)
+    except ImportError:
+        pass
 
 
 def _env_id_for_config(config_name: ConfigName) -> str:
     if config_name == "curriculum_enriched":
         return "gymnasium_env/GridWorldCPPEnriched-v0"
+    if config_name == "mapcnn_bc_pbrs":
+        return "gymnasium_env/GridWorldCPPMapObs-v0"
     return "gymnasium_env/GridWorldCPP-v0"
 
 

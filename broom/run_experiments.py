@@ -24,6 +24,7 @@ CURRICULUM_CONFIGS: tuple[ConfigName, ...] = (
     "curriculum_enriched",
     "curriculum_recurrent",
     "curriculum_recurrent_v2",
+    "mapcnn_bc_pbrs",
 )
 
 

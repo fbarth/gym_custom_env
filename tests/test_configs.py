@@ -47,8 +47,18 @@ def test_config_names_complete():
         "curriculum_enriched",
         "curriculum_recurrent",
         "curriculum_recurrent_v2",
+        "mapcnn_bc_pbrs",
     }
     assert set(ConfigName.__args__) == expected
+
+
+def test_mapcnn_bc_pbrs_hyperparams_use_cuda_long_horizon_and_long_rollout():
+    from broom.configs import MAPCNN_BC_PBRS_HYPERPARAMS, BC_WARMSTART_PATH, PBRS_GAMMA
+    assert MAPCNN_BC_PBRS_HYPERPARAMS["device"] == "cuda"
+    assert MAPCNN_BC_PBRS_HYPERPARAMS["gamma"] >= 0.99
+    assert MAPCNN_BC_PBRS_HYPERPARAMS["n_steps"] >= 1024
+    assert BC_WARMSTART_PATH.endswith(".zip")
+    assert 0.9 <= PBRS_GAMMA <= 1.0
 
 
 def test_grid_size_args():

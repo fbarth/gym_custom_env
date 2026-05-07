@@ -20,6 +20,9 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
 from broom.configs import (
+    BC_WARMSTART_PATH,
+    MAPCNN_BC_PBRS_HYPERPARAMS,
+    PBRS_GAMMA,
     PHASE_MAX_STEPS,
     PHASE_OBSTACLES,
     PHASE_TIMESTEPS,
@@ -30,6 +33,7 @@ from broom.configs import (
     GridSize,
     get_phase_n_envs,
 )
+from broom.wrappers import PBRSCoverageWrapper
 from gymnasium_env.grid_world_cpp import GridWorldCPPEnv
 
 
@@ -59,26 +63,41 @@ def _register_envs():
             gym.register(id="gymnasium_env/GridWorldCPPEnriched-v0", entry_point=GridWorldCPPEnrichedEnv)
     except ImportError:
         pass
+    try:
+        from gymnasium_env.grid_world_cpp_mapobs import GridWorldCPPMapObsEnv
+        if "gymnasium_env/GridWorldCPPMapObs-v0" not in gym.envs.registry:
+            gym.register(id="gymnasium_env/GridWorldCPPMapObs-v0", entry_point=GridWorldCPPMapObsEnv)
+    except ImportError:
+        pass
 
 
 def _env_id_for_config(config_name: ConfigName) -> str:
     if config_name == "curriculum_enriched":
         return "gymnasium_env/GridWorldCPPEnriched-v0"
+    if config_name == "mapcnn_bc_pbrs":
+        return "gymnasium_env/GridWorldCPPMapObs-v0"
     return "gymnasium_env/GridWorldCPP-v0"
 
 
-def _make_env_fn(env_id: str, size: int, max_steps: int, obstacles: int, seed: int):
-    """Wraps in Monitor so SB3 populates info["episode"] = {r, l, t} on done."""
+def _make_env_fn(env_id: str, size: int, max_steps: int, obstacles: int, seed: int, apply_pbrs: bool = False):
+    """Wraps in Monitor so SB3 populates info["episode"] = {r, l, t} on done.
+
+    If `apply_pbrs` is True, also wraps in PBRSCoverageWrapper before Monitor so
+    the shaped reward is what PPO sees during training. Eval uses the raw env
+    via inference.evaluate, which never applies PBRS.
+    """
     def _thunk():
         _register_envs()
         env = gym.make(env_id, size=size, obs_quantity=obstacles, max_steps=max_steps)
+        if apply_pbrs:
+            env = PBRSCoverageWrapper(env, gamma=PBRS_GAMMA)
         env.reset(seed=seed)
         return Monitor(env)
     return _thunk
 
 
-def _make_vec_env(env_id: str, size: int, max_steps: int, obstacles: int, seed: int, n_envs: int):
-    fns = [_make_env_fn(env_id, size, max_steps, obstacles, seed + i) for i in range(n_envs)]
+def _make_vec_env(env_id: str, size: int, max_steps: int, obstacles: int, seed: int, n_envs: int, apply_pbrs: bool = False):
+    fns = [_make_env_fn(env_id, size, max_steps, obstacles, seed + i, apply_pbrs=apply_pbrs) for i in range(n_envs)]
     return DummyVecEnv(fns) if n_envs == 1 else SubprocVecEnv(fns)
 
 
@@ -120,6 +139,22 @@ def _recurrent_hyperparams(config_name: ConfigName) -> dict:
     return RECURRENT_HYPERPARAMS
 
 
+def _uses_pbrs(config_name: ConfigName) -> bool:
+    return config_name == "mapcnn_bc_pbrs"
+
+
+def _bc_warmstart_for(config_name: ConfigName, size: GridSize) -> Optional[str]:
+    """First-phase warm-start path. Only `mapcnn_bc_pbrs` has a BC checkpoint,
+    and only in the first curriculum phase (5x5). Subsequent phases use
+    init_from from the orchestrator (chained from the previous phase model).
+    """
+    if config_name == "mapcnn_bc_pbrs" and size == 5:
+        path = Path(BC_WARMSTART_PATH)
+        if path.exists():
+            return str(path)
+    return None
+
+
 def train_one(
     config_name: ConfigName,
     seed: int,
@@ -140,7 +175,7 @@ def train_one(
     max_steps = PHASE_MAX_STEPS[size]
     timesteps = total_timesteps if total_timesteps is not None else PHASE_TIMESTEPS[size]
 
-    vec_env = _make_vec_env(env_id, size, max_steps, obstacles, seed, n_envs)
+    vec_env = _make_vec_env(env_id, size, max_steps, obstacles, seed, n_envs, apply_pbrs=_uses_pbrs(config_name))
 
     results = _results_dir()
     tag = f"{config_name}_seed{seed}_{size}x{size}"
@@ -162,6 +197,12 @@ def train_one(
             model = RecurrentPPO.load(init_from, env=vec_env, verbose=verbose, **hp)
         else:
             model = RecurrentPPO("MultiInputLstmPolicy", vec_env, seed=seed, verbose=verbose, **hp)
+    elif config_name == "mapcnn_bc_pbrs":
+        warmstart = init_from if init_from is not None else _bc_warmstart_for(config_name, size)
+        if warmstart is not None:
+            model = PPO.load(warmstart, env=vec_env, verbose=verbose, **MAPCNN_BC_PBRS_HYPERPARAMS)
+        else:
+            model = PPO("MultiInputPolicy", vec_env, seed=seed, verbose=verbose, **MAPCNN_BC_PBRS_HYPERPARAMS)
     else:
         if init_from is not None:
             model = PPO.load(init_from, env=vec_env, verbose=verbose, **PPO_HYPERPARAMS)
