@@ -20,8 +20,13 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
 from broom.configs import (
+    BC_V3_WARMSTART_PATH,
     BC_WARMSTART_PATH,
+    KL_LAMBDA_DECAY_TIMESTEPS,
+    KL_LAMBDA_FINAL,
+    KL_LAMBDA_INITIAL,
     MAPCNN_BC_PBRS_HYPERPARAMS,
+    MASKABLE_BC_KL_HYPERPARAMS,
     MASKABLE_V3_HYPERPARAMS,
     PBRS_GAMMA,
     PHASE_MAX_STEPS,
@@ -85,7 +90,7 @@ def _env_id_for_config(config_name: ConfigName) -> str:
         return "gymnasium_env/GridWorldCPPEnriched-v0"
     if config_name == "mapcnn_bc_pbrs":
         return "gymnasium_env/GridWorldCPPMapObs-v0"
-    if config_name == "maskable_v3":
+    if config_name in ("maskable_v3", "maskable_bc_kl"):
         return "gymnasium_env/GridWorldCPPV3-v0"
     return "gymnasium_env/GridWorldCPP-v0"
 
@@ -181,7 +186,7 @@ def _uses_pbrs(config_name: ConfigName) -> bool:
 
 
 def _uses_action_mask(config_name: ConfigName) -> bool:
-    return config_name == "maskable_v3"
+    return config_name in ("maskable_v3", "maskable_bc_kl")
 
 
 def _bc_warmstart_for(config_name: ConfigName, size: GridSize) -> Optional[str]:
@@ -258,6 +263,41 @@ def train_one(
             model = MaskablePPO.load(init_from, env=vec_env, verbose=verbose, **MASKABLE_V3_HYPERPARAMS)
         else:
             model = MaskablePPO("MultiInputPolicy", vec_env, seed=seed, verbose=verbose, **MASKABLE_V3_HYPERPARAMS)
+    elif config_name == "maskable_bc_kl":
+        from broom.maskable_bc_kl import MaskablePPOWithKLAnchor, make_kl_lambda_schedule
+        kl_schedule = make_kl_lambda_schedule(
+            initial=KL_LAMBDA_INITIAL,
+            final=KL_LAMBDA_FINAL,
+            decay_over_timesteps=KL_LAMBDA_DECAY_TIMESTEPS,
+        )
+        if init_from is not None:
+            # Curriculum continuation: the warmstart already has BC weights inside,
+            # but we still load the KL anchor BC reference separately so the
+            # subsequent curriculum phases keep being pulled toward the BC manifold.
+            model = MaskablePPOWithKLAnchor.load(
+                init_from, env=vec_env, verbose=verbose,
+                bc_policy_path=BC_V3_WARMSTART_PATH,
+                kl_lambda_schedule=kl_schedule,
+                **MASKABLE_BC_KL_HYPERPARAMS,
+            )
+        else:
+            # First phase (5x5): BC checkpoint serves both as initialization and
+            # as the KL anchor reference.
+            warmstart = BC_V3_WARMSTART_PATH if Path(BC_V3_WARMSTART_PATH).exists() else None
+            if warmstart is not None:
+                model = MaskablePPOWithKLAnchor.load(
+                    warmstart, env=vec_env, verbose=verbose,
+                    bc_policy_path=warmstart,
+                    kl_lambda_schedule=kl_schedule,
+                    **MASKABLE_BC_KL_HYPERPARAMS,
+                )
+            else:
+                model = MaskablePPOWithKLAnchor(
+                    "MultiInputPolicy", vec_env, seed=seed, verbose=verbose,
+                    bc_policy_path=None,  # no anchor if BC not yet generated
+                    kl_lambda_schedule=kl_schedule,
+                    **MASKABLE_BC_KL_HYPERPARAMS,
+                )
     else:
         if init_from is not None:
             model = PPO.load(init_from, env=vec_env, verbose=verbose, **PPO_HYPERPARAMS)

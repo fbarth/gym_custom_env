@@ -48,7 +48,7 @@ def _env_id_for_config(config_name: ConfigName) -> str:
         return "gymnasium_env/GridWorldCPPEnriched-v0"
     if config_name == "mapcnn_bc_pbrs":
         return "gymnasium_env/GridWorldCPPMapObs-v0"
-    if config_name == "maskable_v3":
+    if config_name in ("maskable_v3", "maskable_bc_kl"):
         return "gymnasium_env/GridWorldCPPV3-v0"
     return "gymnasium_env/GridWorldCPP-v0"
 
@@ -62,6 +62,11 @@ def _load_model(model_path: str, config_name: ConfigName, env: gym.Env):
         return RecurrentPPO.load(model_path, env=env, device="cpu")
     if config_name == "maskable_v3":
         from sb3_contrib import MaskablePPO
+        return MaskablePPO.load(model_path, env=env, device="cpu")
+    if config_name == "maskable_bc_kl":
+        from sb3_contrib import MaskablePPO
+        # At inference we don't need the KL anchor; load as plain MaskablePPO
+        # since the saved policy weights are state-dict compatible.
         return MaskablePPO.load(model_path, env=env, device="cpu")
     return PPO.load(model_path, env=env, device="cpu")
 
@@ -104,7 +109,7 @@ def evaluate(
             if config_name in ("curriculum_recurrent", "curriculum_recurrent_v2"):
                 action, lstm_state = model.predict(obs, state=lstm_state, episode_start=episode_starts, deterministic=False)
                 episode_starts = np.zeros((1,), dtype=bool)
-            elif config_name == "maskable_v3":
+            elif config_name in ("maskable_v3", "maskable_bc_kl"):
                 masks = env.unwrapped.action_masks()
                 action, _ = model.predict(obs, deterministic=False, action_masks=masks)
             else:
