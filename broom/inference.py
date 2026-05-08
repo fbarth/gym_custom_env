@@ -13,6 +13,7 @@ import numpy as np
 from stable_baselines3 import PPO
 
 from broom.configs import PHASE_MAX_STEPS, PHASE_OBSTACLES, ConfigName, GridSize
+from broom.solvability import count_reachable_cells
 from gymnasium_env.grid_world_cpp import GridWorldCPPEnv
 
 
@@ -93,13 +94,21 @@ def evaluate(
     env = gym.make(env_id, size=eval_size, obs_quantity=obstacles, max_steps=max_steps)
     model = _load_model(model_path, config_name, env)
 
-    rows: list[tuple[int, float, int, bool]] = []
+    rows: list[tuple[int, float, int, bool, bool]] = []
     full_coverage_count = 0
+    solvable_count = 0
+    full_coverage_count_solvable = 0
     coverages: list[float] = []
     steps_list: list[int] = []
 
     for ep in range(n_episodes):
         obs, info = env.reset(seed=seed * 1000 + ep)
+        # Compute whether this map is solvable (all free cells reachable from start)
+        # right after reset, before the agent has moved. Stored per-episode so the
+        # filtered metric can be recomputed offline.
+        reachable = count_reachable_cells(env.unwrapped)
+        solvable = reachable >= env.unwrapped.total_free_cells
+
         lstm_state = None
         episode_starts = np.ones((1,), dtype=bool)
         terminated = truncated = False
@@ -118,11 +127,15 @@ def evaluate(
             steps += 1
 
         coverage = info["coverage"]
-        rows.append((ep, coverage, steps, terminated))
+        rows.append((ep, coverage, steps, terminated, solvable))
         coverages.append(coverage)
         steps_list.append(steps)
         if terminated and not truncated:
             full_coverage_count += 1
+            if solvable:
+                full_coverage_count_solvable += 1
+        if solvable:
+            solvable_count += 1
 
     env.close()
 
@@ -134,7 +147,7 @@ def evaluate(
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     with csv_path.open("w", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["episode", "coverage", "steps", "terminated"])
+        w.writerow(["episode", "coverage", "steps", "terminated", "solvable"])
         w.writerows(rows)
 
     return {
@@ -142,6 +155,10 @@ def evaluate(
         "seed": seed,
         "eval_size": eval_size,
         "full_coverage_rate": full_coverage_count / n_episodes,
+        "full_coverage_rate_solvable": (
+            full_coverage_count_solvable / solvable_count if solvable_count > 0 else 0.0
+        ),
+        "n_solvable": solvable_count,
         "avg_coverage": float(np.mean(coverages)),
         "std_coverage": float(np.std(coverages)),
         "avg_steps": float(np.mean(steps_list)),
@@ -169,13 +186,17 @@ def evaluate_scripted(
 
     env = gym.make(env_id, size=eval_size, obs_quantity=obstacles, max_steps=max_steps)
 
-    rows: list[tuple[int, float, int, bool]] = []
+    rows: list[tuple[int, float, int, bool, bool]] = []
     full_coverage_count = 0
+    solvable_count = 0
+    full_coverage_count_solvable = 0
     coverages: list[float] = []
     steps_list: list[int] = []
 
     for ep in range(n_episodes):
         obs, info = env.reset(seed=seed * 1000 + ep)
+        reachable = count_reachable_cells(env.unwrapped)
+        solvable = reachable >= env.unwrapped.total_free_cells
         agent.reset()
         terminated = truncated = False
         steps = 0
@@ -188,11 +209,15 @@ def evaluate_scripted(
             steps += 1
 
         coverage = info["coverage"]
-        rows.append((ep, coverage, steps, terminated))
+        rows.append((ep, coverage, steps, terminated, solvable))
         coverages.append(coverage)
         steps_list.append(steps)
         if terminated and not truncated:
             full_coverage_count += 1
+            if solvable:
+                full_coverage_count_solvable += 1
+        if solvable:
+            solvable_count += 1
 
     env.close()
 
@@ -203,7 +228,7 @@ def evaluate_scripted(
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     with csv_path.open("w", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["episode", "coverage", "steps", "terminated"])
+        w.writerow(["episode", "coverage", "steps", "terminated", "solvable"])
         w.writerows(rows)
 
     return {
@@ -211,6 +236,10 @@ def evaluate_scripted(
         "seed": seed,
         "eval_size": eval_size,
         "full_coverage_rate": full_coverage_count / n_episodes,
+        "full_coverage_rate_solvable": (
+            full_coverage_count_solvable / solvable_count if solvable_count > 0 else 0.0
+        ),
+        "n_solvable": solvable_count,
         "avg_coverage": float(np.mean(coverages)),
         "std_coverage": float(np.std(coverages)),
         "avg_steps": float(np.mean(steps_list)),
