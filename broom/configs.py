@@ -14,6 +14,7 @@ ConfigName = Literal[
     "curriculum_recurrent",
     "curriculum_recurrent_v2",
     "mapcnn_bc_pbrs",
+    "maskable_v3",
 ]
 GridSize = Literal[5, 10, 20]
 
@@ -110,6 +111,38 @@ BC_WARMSTART_PATH = "results/models/bc_warmstart.zip"
 
 # Discount used inside the PBRS shaping wrapper. Matches the PPO gamma above.
 PBRS_GAMMA = 0.999
+
+
+# Maskable PPO + reward redesign (Epic 8). Bundle of changes targeting the
+# closing-cell ceiling at 77% on 10x10:
+#   * action masking via sb3-contrib MaskablePPO (Huang & Ontanon arXiv 2006.14171)
+#   * reward redesign: terminal +60, truncation 0, step penalty gated on coverage>=0.80
+#     (calibrated from Theile et al. arXiv 2309.03157)
+#   * gamma 0.999 for long-horizon credit assignment
+#   * entropy schedule from 0.02 -> 0.001 (linear, via SB3 Schedule callable)
+#   * larger MLP head (256x256) since the closing decision likely needs
+#     more capacity than the default (64x64).
+def _maskable_v3_entropy_schedule(progress_remaining: float) -> float:
+    """Linear entropy anneal from 0.02 (start) to 0.001 (end).
+
+    Applied via a callback that mutates `model.ent_coef` between rollouts —
+    SB3's MaskablePPO/PPO don't support a callable `ent_coef` natively.
+    """
+    progress = 1.0 - progress_remaining
+    return max(0.001, 0.02 * (1.0 - progress))
+
+
+# Initial ent_coef passed to the constructor; the callback overrides it at
+# every rollout start based on `_maskable_v3_entropy_schedule`.
+MASKABLE_V3_HYPERPARAMS = {
+    "ent_coef": 0.02,
+    "device": "cuda",
+    "n_steps": 1024,
+    "gamma": 0.999,
+    "gae_lambda": 0.97,
+    "learning_rate": 3e-4,
+    "policy_kwargs": {"net_arch": [256, 256]},
+}
 
 
 # Curriculum chain: each entry is (size, init_from_size or None)

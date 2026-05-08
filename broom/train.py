@@ -22,6 +22,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from broom.configs import (
     BC_WARMSTART_PATH,
     MAPCNN_BC_PBRS_HYPERPARAMS,
+    MASKABLE_V3_HYPERPARAMS,
     PBRS_GAMMA,
     PHASE_MAX_STEPS,
     PHASE_OBSTACLES,
@@ -31,8 +32,10 @@ from broom.configs import (
     RECURRENT_V2_HYPERPARAMS,
     ConfigName,
     GridSize,
+    _maskable_v3_entropy_schedule,
     get_phase_n_envs,
 )
+from stable_baselines3.common.callbacks import CallbackList
 from broom.wrappers import PBRSCoverageWrapper
 from gymnasium_env.grid_world_cpp import GridWorldCPPEnv
 
@@ -69,6 +72,12 @@ def _register_envs():
             gym.register(id="gymnasium_env/GridWorldCPPMapObs-v0", entry_point=GridWorldCPPMapObsEnv)
     except ImportError:
         pass
+    try:
+        from gymnasium_env.grid_world_cpp_v3 import GridWorldCPPV3Env
+        if "gymnasium_env/GridWorldCPPV3-v0" not in gym.envs.registry:
+            gym.register(id="gymnasium_env/GridWorldCPPV3-v0", entry_point=GridWorldCPPV3Env)
+    except ImportError:
+        pass
 
 
 def _env_id_for_config(config_name: ConfigName) -> str:
@@ -76,28 +85,36 @@ def _env_id_for_config(config_name: ConfigName) -> str:
         return "gymnasium_env/GridWorldCPPEnriched-v0"
     if config_name == "mapcnn_bc_pbrs":
         return "gymnasium_env/GridWorldCPPMapObs-v0"
+    if config_name == "maskable_v3":
+        return "gymnasium_env/GridWorldCPPV3-v0"
     return "gymnasium_env/GridWorldCPP-v0"
 
 
-def _make_env_fn(env_id: str, size: int, max_steps: int, obstacles: int, seed: int, apply_pbrs: bool = False):
+def _make_env_fn(env_id: str, size: int, max_steps: int, obstacles: int, seed: int, apply_pbrs: bool = False, apply_action_mask: bool = False):
     """Wraps in Monitor so SB3 populates info["episode"] = {r, l, t} on done.
 
     If `apply_pbrs` is True, also wraps in PBRSCoverageWrapper before Monitor so
     the shaped reward is what PPO sees during training. Eval uses the raw env
     via inference.evaluate, which never applies PBRS.
+
+    If `apply_action_mask` is True, wraps in sb3-contrib's ActionMasker so the
+    `action_masks` method propagates through VecEnv/Monitor for MaskablePPO.
     """
     def _thunk():
         _register_envs()
         env = gym.make(env_id, size=size, obs_quantity=obstacles, max_steps=max_steps)
         if apply_pbrs:
             env = PBRSCoverageWrapper(env, gamma=PBRS_GAMMA)
+        if apply_action_mask:
+            from sb3_contrib.common.wrappers import ActionMasker
+            env = ActionMasker(env, lambda e: e.unwrapped.action_masks())
         env.reset(seed=seed)
         return Monitor(env)
     return _thunk
 
 
-def _make_vec_env(env_id: str, size: int, max_steps: int, obstacles: int, seed: int, n_envs: int, apply_pbrs: bool = False):
-    fns = [_make_env_fn(env_id, size, max_steps, obstacles, seed + i, apply_pbrs=apply_pbrs) for i in range(n_envs)]
+def _make_vec_env(env_id: str, size: int, max_steps: int, obstacles: int, seed: int, n_envs: int, apply_pbrs: bool = False, apply_action_mask: bool = False):
+    fns = [_make_env_fn(env_id, size, max_steps, obstacles, seed + i, apply_pbrs=apply_pbrs, apply_action_mask=apply_action_mask) for i in range(n_envs)]
     return DummyVecEnv(fns) if n_envs == 1 else SubprocVecEnv(fns)
 
 
@@ -129,6 +146,26 @@ class _EpisodeLogger(BaseCallback):
             w.writerows(self._buffer)
 
 
+class _EntropySchedule(BaseCallback):
+    """Mutates `model.ent_coef` between rollouts based on training progress.
+
+    SB3's PPO/MaskablePPO don't accept callable `ent_coef`, so we update the
+    field directly via a callback. Schedule receives `progress_remaining`
+    (1.0 at start, 0.0 at end of `learn`) and returns the next ent_coef.
+    """
+
+    def __init__(self, schedule):
+        super().__init__()
+        self.schedule = schedule
+
+    def _on_rollout_start(self) -> None:
+        progress_remaining = self.model._current_progress_remaining
+        self.model.ent_coef = float(self.schedule(progress_remaining))
+
+    def _on_step(self) -> bool:
+        return True
+
+
 def _is_recurrent(config_name: ConfigName) -> bool:
     return config_name in ("curriculum_recurrent", "curriculum_recurrent_v2")
 
@@ -141,6 +178,10 @@ def _recurrent_hyperparams(config_name: ConfigName) -> dict:
 
 def _uses_pbrs(config_name: ConfigName) -> bool:
     return config_name == "mapcnn_bc_pbrs"
+
+
+def _uses_action_mask(config_name: ConfigName) -> bool:
+    return config_name == "maskable_v3"
 
 
 def _bc_warmstart_for(config_name: ConfigName, size: GridSize) -> Optional[str]:
@@ -175,7 +216,11 @@ def train_one(
     max_steps = PHASE_MAX_STEPS[size]
     timesteps = total_timesteps if total_timesteps is not None else PHASE_TIMESTEPS[size]
 
-    vec_env = _make_vec_env(env_id, size, max_steps, obstacles, seed, n_envs, apply_pbrs=_uses_pbrs(config_name))
+    vec_env = _make_vec_env(
+        env_id, size, max_steps, obstacles, seed, n_envs,
+        apply_pbrs=_uses_pbrs(config_name),
+        apply_action_mask=_uses_action_mask(config_name),
+    )
 
     results = _results_dir()
     tag = f"{config_name}_seed{seed}_{size}x{size}"
@@ -183,7 +228,11 @@ def train_one(
     curve_path = results / "learning_curves" / f"{tag}.csv"
     model_path.parent.mkdir(parents=True, exist_ok=True)
 
-    callback = _EpisodeLogger(curve_path)
+    episode_logger = _EpisodeLogger(curve_path)
+    callbacks: list[BaseCallback] = [episode_logger]
+    if config_name == "maskable_v3":
+        callbacks.append(_EntropySchedule(_maskable_v3_entropy_schedule))
+    callback = CallbackList(callbacks) if len(callbacks) > 1 else callbacks[0]
 
     # verbose=1 prints per-rollout stats (~once every n_steps timesteps).
     # Negligible cost in wall-clock; useful for diagnosing fps, reward trend,
@@ -203,6 +252,12 @@ def train_one(
             model = PPO.load(warmstart, env=vec_env, verbose=verbose, **MAPCNN_BC_PBRS_HYPERPARAMS)
         else:
             model = PPO("MultiInputPolicy", vec_env, seed=seed, verbose=verbose, **MAPCNN_BC_PBRS_HYPERPARAMS)
+    elif config_name == "maskable_v3":
+        from sb3_contrib import MaskablePPO
+        if init_from is not None:
+            model = MaskablePPO.load(init_from, env=vec_env, verbose=verbose, **MASKABLE_V3_HYPERPARAMS)
+        else:
+            model = MaskablePPO("MultiInputPolicy", vec_env, seed=seed, verbose=verbose, **MASKABLE_V3_HYPERPARAMS)
     else:
         if init_from is not None:
             model = PPO.load(init_from, env=vec_env, verbose=verbose, **PPO_HYPERPARAMS)

@@ -48,6 +48,7 @@ def test_config_names_complete():
         "curriculum_recurrent",
         "curriculum_recurrent_v2",
         "mapcnn_bc_pbrs",
+        "maskable_v3",
     }
     assert set(ConfigName.__args__) == expected
 
@@ -105,3 +106,20 @@ def test_v2_uses_full_n_envs_unlike_v1():
     assert get_phase_n_envs("curriculum_recurrent_v2", 5) == 4
     assert get_phase_n_envs("curriculum_recurrent_v2", 10) == 4
     assert get_phase_n_envs("curriculum_recurrent_v2", 20) == 2
+
+
+def test_maskable_v3_hyperparams_use_cuda_long_horizon_and_entropy_schedule():
+    from broom.configs import MASKABLE_V3_HYPERPARAMS, _maskable_v3_entropy_schedule
+
+    assert MASKABLE_V3_HYPERPARAMS["device"] == "cuda"
+    assert MASKABLE_V3_HYPERPARAMS["gamma"] >= 0.99
+    assert MASKABLE_V3_HYPERPARAMS["n_steps"] >= 1024
+    pkw = MASKABLE_V3_HYPERPARAMS["policy_kwargs"]
+    assert pkw["net_arch"] == [256, 256]
+
+    # Schedule decays from ~0.02 at start to ~0.001 at end
+    assert _maskable_v3_entropy_schedule(1.0) == 0.02
+    assert _maskable_v3_entropy_schedule(0.0) == 0.001
+    # Monotone decreasing
+    mid = _maskable_v3_entropy_schedule(0.5)
+    assert 0.001 < mid < 0.02

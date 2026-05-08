@@ -76,6 +76,7 @@ RL_CONFIGS = (
     "curriculum_recurrent",
     "curriculum_recurrent_v2",
     "mapcnn_bc_pbrs",
+    "maskable_v3",
 )
 SCRIPTED_ALGOS = ("frontier", "boustrophedon")
 

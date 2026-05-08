@@ -35,6 +35,12 @@ def _register_envs():
             gym.register(id="gymnasium_env/GridWorldCPPMapObs-v0", entry_point=GridWorldCPPMapObsEnv)
     except ImportError:
         pass
+    try:
+        from gymnasium_env.grid_world_cpp_v3 import GridWorldCPPV3Env
+        if "gymnasium_env/GridWorldCPPV3-v0" not in gym.envs.registry:
+            gym.register(id="gymnasium_env/GridWorldCPPV3-v0", entry_point=GridWorldCPPV3Env)
+    except ImportError:
+        pass
 
 
 def _env_id_for_config(config_name: ConfigName) -> str:
@@ -42,6 +48,8 @@ def _env_id_for_config(config_name: ConfigName) -> str:
         return "gymnasium_env/GridWorldCPPEnriched-v0"
     if config_name == "mapcnn_bc_pbrs":
         return "gymnasium_env/GridWorldCPPMapObs-v0"
+    if config_name == "maskable_v3":
+        return "gymnasium_env/GridWorldCPPV3-v0"
     return "gymnasium_env/GridWorldCPP-v0"
 
 
@@ -52,6 +60,9 @@ def _load_model(model_path: str, config_name: ConfigName, env: gym.Env):
         # 100-episode evaluation loop, which doesn't benefit from GPU much
         # (one env, no batching).
         return RecurrentPPO.load(model_path, env=env, device="cpu")
+    if config_name == "maskable_v3":
+        from sb3_contrib import MaskablePPO
+        return MaskablePPO.load(model_path, env=env, device="cpu")
     return PPO.load(model_path, env=env, device="cpu")
 
 
@@ -93,6 +104,9 @@ def evaluate(
             if config_name in ("curriculum_recurrent", "curriculum_recurrent_v2"):
                 action, lstm_state = model.predict(obs, state=lstm_state, episode_start=episode_starts, deterministic=False)
                 episode_starts = np.zeros((1,), dtype=bool)
+            elif config_name == "maskable_v3":
+                masks = env.unwrapped.action_masks()
+                action, _ = model.predict(obs, deterministic=False, action_masks=masks)
             else:
                 action, _ = model.predict(obs, deterministic=False)
             obs, reward, terminated, truncated, info = env.step(int(action))
